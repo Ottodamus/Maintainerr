@@ -2,6 +2,7 @@ import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { setupGracefulShutdown } from '@tygra/nestjs-graceful-shutdown';
+import cookieParser from 'cookie-parser';
 import * as fs from 'fs';
 import { cleanupOpenApiDoc } from 'nestjs-zod';
 import path from 'path';
@@ -24,6 +25,8 @@ async function bootstrap() {
   });
 
   setupGracefulShutdown({ app });
+
+  app.use(cookieParser());
 
   const basePathEnv = process.env.BASE_PATH?.trim();
   if (basePathEnv && basePathEnv !== '/') {

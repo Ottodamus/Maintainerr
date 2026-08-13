@@ -149,20 +149,43 @@ describe('database migrations', () => {
       expect(settings.tracearr_url).toMatchObject(nullableVarchar);
       expect(settings.tracearr_api_key).toMatchObject(nullableVarchar);
       expect(settings.tracearr_server_id).toMatchObject(nullableVarchar);
+
+      // AddUsers: the user table's columns.
+      const user = byName(await columns(ds, 'user'));
+      expect(user.plexId).toMatchObject(nullableVarchar);
+      expect(user.plexUsername).toMatchObject({
+        type: 'varchar',
+        notnull: 1,
+      });
+      expect(user.role).toMatchObject({
+        type: 'INTEGER',
+        notnull: 1,
+        dflt_value: '2',
+      });
+      expect(user.allowed).toMatchObject({
+        type: 'boolean',
+        notnull: 1,
+        dflt_value: '0',
+      });
     } finally {
       await ds.destroy();
     }
   });
 
-  it('emit the SQLite create-temporary-table rebuild (generated, not hand-waived)', () => {
+  it('creates the user table with its generated indexes (generated, not hand-waived)', () => {
     const newest = all[all.length - 1];
     const src = fs.readFileSync(path.join(MIGRATIONS_DIR, newest.file), 'utf8');
-    // SQLite can't ALTER most columns in place, so `migration:generate` always
-    // emits a full create-temporary-table / copy / drop / rename rebuild for the
-    // changed tables. A hand-written ALTER shortcut lacks it - this is the
-    // cheapest signal the migration was generated rather than authored. The
-    // newest migration adds settings columns, so it rebuilds that table.
-    expect(src).toContain('CREATE TABLE "temporary_settings"');
+    // Unlike a column addition to an existing table (which forces SQLite's
+    // create-temporary-table rebuild, the fingerprint the previous newest
+    // migration was checked against here), a brand new table is a plain
+    // CREATE TABLE. The generated signal instead is the exact column list
+    // plus the two unique indexes TypeORM derives from the entity's
+    // @Index({ unique: true }) decorators - a hand-written migration could
+    // easily miss one.
+    expect(src).toContain('CREATE TABLE "user"');
+    expect(src).toContain('CREATE UNIQUE INDEX');
+    expect(src).toContain('ON "user" ("plexId")');
+    expect(src).toContain('ON "user" ("plexUsername")');
   });
 
   // We don't revert the whole chain: several pre-existing migrations have
@@ -174,9 +197,11 @@ describe('database migrations', () => {
     try {
       await ds.runMigrations();
       const has = async () =>
-        (await columns(ds, 'settings')).some(
-          (c) => c.name === 'tracearr_server_id',
-        );
+        (
+          await ds.query(
+            `SELECT name FROM sqlite_master WHERE type='table' AND name='user'`,
+          )
+        ).length > 0;
       expect(await has()).toBe(true);
 
       await ds.undoLastMigration();

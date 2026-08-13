@@ -34,6 +34,8 @@ import { SettingsModule } from '../modules/settings/settings.module';
 import { SettingsDataService } from '../modules/settings/settings-data.service';
 import { StorageMetricsModule } from '../modules/storage-metrics/storage-metrics.module';
 import { VersionModule } from '../modules/version/version.module';
+import { AuthModule } from '../modules/auth/auth.module';
+import { UsersModule } from '../modules/users/users.module';
 import { AppController } from './app.controller';
 import { HealthController } from './health.controller';
 import { HealthService } from './health.service';
@@ -49,6 +51,8 @@ import { resolveUiRootPath } from './config/uiPath';
     }),
     LogsModule,
     SettingsModule,
+    UsersModule,
+    AuthModule,
     PlexApiModule,
     MediaServerModule,
     ExternalApiModule,

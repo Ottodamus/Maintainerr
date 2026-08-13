@@ -59,6 +59,7 @@ const collectionExclusionsRoute = createLazyRoute(
   () => import('./pages/CollectionExclusionsPage'),
 )
 const calendarRoute = createLazyRoute(() => import('./pages/CalendarPage'))
+const loginRoute = createLazyRoute(() => import('./pages/LoginPage'))
 const storageMetricsRoute = createLazyRoute(
   () => import('./pages/StorageMetricsPage'),
 )
@@ -444,6 +445,10 @@ export const prefetchRoute = (path: string) => {
 
 export const router = createBrowserRouter(
   [
+    {
+      path: '/login',
+      lazy: loginRoute.lazy,
+    },
     {
       path: '/',
       element: <Layout />,
