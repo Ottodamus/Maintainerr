@@ -1,5 +1,6 @@
 import { Transition, TransitionChild } from '@headlessui/react'
 import {
+  BadgeCheckIcon,
   CalendarIcon,
   ChartBarIcon,
   ClipboardCheckIcon,
@@ -76,6 +77,13 @@ const NavBar: React.FC<NavBarProps> = ({ open, setClosed }) => {
         svgIcon: <ChartBarIcon className="mr-3 h-6 w-6" />,
         name: 'Storage',
         matchPattern: /^\/storage-metrics(?:\/.*)?$/,
+      },
+      {
+        key: '7',
+        href: '/approvals',
+        svgIcon: <BadgeCheckIcon className="mr-3 h-6 w-6" />,
+        name: 'Approvals',
+        matchPattern: /^\/approvals(?:\/.*)?$/,
       },
       {
         key: '3',

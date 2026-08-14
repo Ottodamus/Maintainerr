@@ -1,4 +1,7 @@
-import { MediaItemWithParent } from '@maintainerr/contracts';
+import {
+  CollectionMediaApprovalState,
+  MediaItemWithParent,
+} from '@maintainerr/contracts';
 import {
   BeforeInsert,
   BeforeUpdate,
@@ -55,6 +58,14 @@ export class CollectionMedia {
 
   @Column({ default: false })
   ruleEvaluationFailed: boolean;
+
+  // null when the owning collection has no approval requirement (or hasn't
+  // been evaluated for handling yet). Set to PENDING the first time
+  // handleMedia() sees a gated collection's item; set to APPROVED once
+  // enough votes land. A reject vote removes the row instead of setting a
+  // 'rejected' state - see CollectionMediaApprovalState.
+  @Column({ type: 'varchar', nullable: true, default: null })
+  approvalState: CollectionMediaApprovalState | null;
 
   @BeforeInsert()
   @BeforeUpdate()

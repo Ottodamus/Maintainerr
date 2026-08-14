@@ -96,6 +96,7 @@ export const createCollection = (
     overlayTemplateId: null,
     overlayTemplate: null,
     mediaServerSort: null,
+    requiredApprovals: 0,
     ...properties,
   };
 };
@@ -129,6 +130,7 @@ export const createCollectionMedia = (
     mediaServerId: faker.number.int().toString(),
     tmdbId: faker.number.int(),
     sizeBytes: null,
+    approvalState: null,
     ...properties,
   });
 };

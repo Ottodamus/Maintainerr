@@ -1,3 +1,4 @@
+import { CollectionMediaApprovalState } from '@maintainerr/contracts';
 import { Injectable } from '@nestjs/common';
 import { RadarrActionHandler } from '../actions/radarr-action-handler';
 import { SonarrActionHandler } from '../actions/sonarr-action-handler';
@@ -8,6 +9,7 @@ import { SeerrApiService } from '../api/seerr-api/seerr-api.service';
 import { MaintainerrLogger } from '../logging/logs.service';
 import { MetadataService } from '../metadata/metadata.service';
 import { SettingsDataService } from '../settings/settings-data.service';
+import { CollectionApprovalService } from './collection-approval.service';
 import { CollectionsService } from './collections.service';
 import { Collection } from './entities/collection.entities';
 import { CollectionMedia } from './entities/collection_media.entities';
@@ -20,14 +22,18 @@ import { RecentlyHandledMediaService } from './recently-handled-media.service';
  * - `failed`: the action could not be completed; the item stays for retry.
  * - `removed-missing`: the item no longer existed on the media server and was
  *   pruned from the collection(s) - a cleanup, not a failure or a real handle.
+ * - `awaiting-approval`: the collection requires N-of-M approval and this
+ *   item hasn't reached it yet; no action was taken.
  */
-export type HandleMediaResult = 'handled' | 'failed' | 'removed-missing';
+export type HandleMediaResult =
+  'handled' | 'failed' | 'removed-missing' | 'awaiting-approval';
 
 @Injectable()
 export class CollectionHandler {
   constructor(
     private readonly mediaServerFactory: MediaServerFactory,
     private readonly collectionService: CollectionsService,
+    private readonly collectionApprovalService: CollectionApprovalService,
     private readonly seerrApi: SeerrApiService,
     private readonly settings: SettingsDataService,
     private readonly metadataService: MetadataService,
@@ -53,6 +59,21 @@ export class CollectionHandler {
   ): Promise<HandleMediaResult> {
     if (collection.arrAction === ServarrAction.DO_NOTHING) {
       return 'failed';
+    }
+
+    // Approval gate: must run before anything else in this method, since
+    // everything below either mutates the media server or *arr state. A
+    // reject vote removes the item from the collection immediately (see
+    // CollectionApprovalService), so this method never has to reconcile a
+    // rejected state - only pending vs approved.
+    if (
+      collection.requiredApprovals > 0 &&
+      media.approvalState !== CollectionMediaApprovalState.APPROVED
+    ) {
+      if (media.approvalState !== CollectionMediaApprovalState.PENDING) {
+        await this.collectionApprovalService.requestApproval(collection, media);
+      }
+      return 'awaiting-approval';
     }
 
     const mediaServer = await this.getMediaServer();

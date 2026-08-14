@@ -188,6 +188,7 @@ export class CollectionWorkerService extends TaskBase {
       this.logger.log('Started handling of all collections');
       let handledCollectionMedia = 0;
       let removedMissingMedia = 0;
+      let awaitingApprovalMedia = 0;
       let collectionHandlingFailed = false;
       let doNothingCollectionCount = 0;
       let noDueMediaCollectionCount = 0;
@@ -354,6 +355,12 @@ export class CollectionWorkerService extends TaskBase {
             // and doesn't trigger availability sync - the handler already
             // logged the cleanup.
             removedMissingMedia++;
+          } else if (result === 'awaiting-approval') {
+            // Not a failure: the item is correctly blocked pending sign-off.
+            // No notification, no retry pressure - the approval flow (or a
+            // future vote) is what moves it forward, not another run of this
+            // worker.
+            awaitingApprovalMedia++;
           } else {
             collectionHandlingFailed = true;
             failedMediaForNotification.push({
@@ -424,6 +431,12 @@ export class CollectionWorkerService extends TaskBase {
       if (removedMissingMedia > 0) {
         this.logger.log(
           `Removed ${removedMissingMedia} item(s) from collections because they no longer exist on the media server`,
+        );
+      }
+
+      if (awaitingApprovalMedia > 0) {
+        this.logger.log(
+          `${awaitingApprovalMedia} item(s) are awaiting approval before they can be handled`,
         );
       }
 

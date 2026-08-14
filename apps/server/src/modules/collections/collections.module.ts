@@ -14,6 +14,9 @@ import { RuleGroup } from '../rules/entities/rule-group.entities';
 import { RulesModule } from '../rules/rules.module';
 import { SettingsModule } from '../settings/settings.module';
 import { TasksModule } from '../tasks/tasks.module';
+import { UsersModule } from '../users/users.module';
+import { CollectionApprovalController } from './collection-approval.controller';
+import { CollectionApprovalService } from './collection-approval.service';
 import { CollectionHandler } from './collection-handler';
 import { CollectionPosterService } from './collection-poster.service';
 import { CollectionWorkerService } from './collection-worker.service';
@@ -21,6 +24,7 @@ import { CollectionsController } from './collections.controller';
 import { CollectionsService } from './collections.service';
 import { Collection } from './entities/collection.entities';
 import { CollectionMedia } from './entities/collection_media.entities';
+import { CollectionMediaApproval } from './entities/collection_media_approval.entities';
 import { CollectionMediaRuleRemoval } from './entities/collection_media_rule_removal.entities';
 import { RecentlyHandledMediaService } from './recently-handled-media.service';
 
@@ -32,6 +36,7 @@ import { RecentlyHandledMediaService } from './recently-handled-media.service';
     TypeOrmModule.forFeature([
       Collection,
       CollectionMedia,
+      CollectionMediaApproval,
       CollectionMediaRuleRemoval,
       CollectionLog,
       RuleGroup,
@@ -43,6 +48,7 @@ import { RecentlyHandledMediaService } from './recently-handled-media.service';
     ServarrApiModule,
     TasksModule,
     ActionsModule,
+    UsersModule,
     forwardRef(() => RulesModule),
   ],
   providers: [
@@ -50,10 +56,11 @@ import { RecentlyHandledMediaService } from './recently-handled-media.service';
     CollectionWorkerService,
     CollectionLogCleanerService,
     CollectionHandler,
+    CollectionApprovalService,
     CollectionPosterService,
     RecentlyHandledMediaService,
   ],
-  controllers: [CollectionsController],
+  controllers: [CollectionsController, CollectionApprovalController],
   exports: [
     CollectionsService,
     CollectionPosterService,

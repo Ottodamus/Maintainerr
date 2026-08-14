@@ -157,6 +157,13 @@ export class Collection {
   @Column({ nullable: false, default: false })
   tagInArr: boolean;
 
+  // 0 = approval gating off (default, fully backward compatible). Above 0,
+  // handleMedia() blocks the configured action until this many distinct
+  // ADMIN/APPROVER users have voted to approve the item - see
+  // CollectionApprovalService.
+  @Column({ nullable: false, default: 0 })
+  requiredApprovals: number;
+
   @OneToMany(
     () => CollectionMedia,
     (collectionMedia) => collectionMedia.collectionId,

@@ -523,11 +523,17 @@ export class CollectionsController {
       );
 
       // 'handled' and 'removed-missing' both leave the item resolved (acted on
-      // or pruned because it no longer exists); only an unrecoverable 'failed'
-      // is surfaced as a conflict.
+      // or pruned because it no longer exists); 'failed' and
+      // 'awaiting-approval' are both surfaced as a conflict so a caller
+      // doesn't read either as success.
       if (result === 'failed') {
         throw new ConflictException(
           'The collection action could not be executed for this item',
+        );
+      }
+      if (result === 'awaiting-approval') {
+        throw new ConflictException(
+          'This item requires approval before it can be handled',
         );
       }
     } finally {

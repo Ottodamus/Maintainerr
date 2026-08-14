@@ -1,4 +1,7 @@
-import { MediaItem } from '@maintainerr/contracts';
+import {
+  CollectionMediaApprovalState,
+  MediaItem,
+} from '@maintainerr/contracts';
 import { Mocked, TestBed } from '@suites/unit';
 import {
   createCollection,
@@ -14,6 +17,7 @@ import { SeerrApiService } from '../api/seerr-api/seerr-api.service';
 import { MaintainerrLogger } from '../logging/logs.service';
 import { MetadataService } from '../metadata/metadata.service';
 import { SettingsDataService } from '../settings/settings-data.service';
+import { CollectionApprovalService } from './collection-approval.service';
 import { CollectionHandler } from './collection-handler';
 import { CollectionsService } from './collections.service';
 import { ServarrAction } from './interfaces/collection.interface';
@@ -24,6 +28,7 @@ describe('CollectionHandler', () => {
   let mediaServerFactory: Mocked<MediaServerFactory>;
   let mediaServer: Mocked<IMediaServerService>;
   let collectionsService: Mocked<CollectionsService>;
+  let collectionApprovalService: Mocked<CollectionApprovalService>;
   let radarrActionHandler: Mocked<RadarrActionHandler>;
   let sonarrActionHandler: Mocked<SonarrActionHandler>;
   let seerrApi: Mocked<SeerrApiService>;
@@ -39,6 +44,7 @@ describe('CollectionHandler', () => {
     collectionHandler = unit;
     mediaServerFactory = unitRef.get(MediaServerFactory);
     collectionsService = unitRef.get(CollectionsService);
+    collectionApprovalService = unitRef.get(CollectionApprovalService);
     radarrActionHandler = unitRef.get(RadarrActionHandler);
     sonarrActionHandler = unitRef.get(SonarrActionHandler);
     seerrApi = unitRef.get(SeerrApiService);
@@ -91,6 +97,90 @@ describe('CollectionHandler', () => {
     ).resolves.toBe('failed');
 
     expect(collectionsService.removeFromCollection).not.toHaveBeenCalled();
+  });
+
+  describe('approval gate', () => {
+    it('requests approval and blocks the action the first time a gated item is seen', async () => {
+      const collection = createCollection({
+        arrAction: ServarrAction.DELETE,
+        type: 'movie',
+        requiredApprovals: 1,
+      });
+      const collectionMedia = createCollectionMedia(collection, {
+        approvalState: null,
+      });
+
+      await expect(
+        collectionHandler.handleMedia(collection, collectionMedia),
+      ).resolves.toBe('awaiting-approval');
+
+      expect(collectionApprovalService.requestApproval).toHaveBeenCalledWith(
+        collection,
+        collectionMedia,
+      );
+      expect(mediaServerFactory.getService).not.toHaveBeenCalled();
+      expect(collectionsService.removeFromCollection).not.toHaveBeenCalled();
+    });
+
+    it('keeps blocking a pending item without re-requesting approval', async () => {
+      const collection = createCollection({
+        arrAction: ServarrAction.DELETE,
+        type: 'movie',
+        requiredApprovals: 2,
+      });
+      const collectionMedia = createCollectionMedia(collection, {
+        approvalState: CollectionMediaApprovalState.PENDING,
+      });
+
+      await expect(
+        collectionHandler.handleMedia(collection, collectionMedia),
+      ).resolves.toBe('awaiting-approval');
+
+      expect(collectionApprovalService.requestApproval).not.toHaveBeenCalled();
+    });
+
+    it('proceeds with the configured action once approved', async () => {
+      const collection = createCollection({
+        arrAction: ServarrAction.DELETE,
+        type: 'show',
+        requiredApprovals: 1,
+      });
+      const collectionMedia = createCollectionMedia(collection, {
+        approvalState: CollectionMediaApprovalState.APPROVED,
+      });
+
+      mediaServer.getLibraries.mockResolvedValue(
+        createMediaLibraries({ id: collection.libraryId.toString() }),
+      );
+
+      await expect(
+        collectionHandler.handleMedia(collection, collectionMedia),
+      ).resolves.toBe('handled');
+
+      expect(collectionApprovalService.requestApproval).not.toHaveBeenCalled();
+      expect(mediaServer.deleteFromDisk).toHaveBeenCalled();
+    });
+
+    it('is a no-op when requiredApprovals is 0 (the default, gating off)', async () => {
+      const collection = createCollection({
+        arrAction: ServarrAction.DELETE,
+        type: 'show',
+        requiredApprovals: 0,
+      });
+      const collectionMedia = createCollectionMedia(collection, {
+        approvalState: null,
+      });
+
+      mediaServer.getLibraries.mockResolvedValue(
+        createMediaLibraries({ id: collection.libraryId.toString() }),
+      );
+
+      await expect(
+        collectionHandler.handleMedia(collection, collectionMedia),
+      ).resolves.toBe('handled');
+
+      expect(collectionApprovalService.requestApproval).not.toHaveBeenCalled();
+    });
   });
 
   it('should delete from disk', async () => {

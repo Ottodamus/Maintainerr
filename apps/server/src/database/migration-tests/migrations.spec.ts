@@ -167,25 +167,50 @@ describe('database migrations', () => {
         notnull: 1,
         dflt_value: '0',
       });
+
+      // AddCollectionApproval: the approval-gating columns/table.
+      expect(collection.requiredApprovals).toMatchObject({
+        type: 'INTEGER',
+        notnull: 1,
+        dflt_value: '0',
+      });
+      const collectionMedia = byName(await columns(ds, 'collection_media'));
+      expect(collectionMedia.approvalState).toMatchObject({
+        type: 'varchar',
+        notnull: 0,
+        dflt_value: null,
+      });
+      const approval = byName(await columns(ds, 'collection_media_approval'));
+      expect(approval.collectionMediaId).toMatchObject({
+        type: 'INTEGER',
+        notnull: 1,
+      });
+      expect(approval.userId).toMatchObject({ type: 'INTEGER', notnull: 1 });
+      expect(approval.decision).toMatchObject({
+        type: 'INTEGER',
+        notnull: 1,
+        dflt_value: '0',
+      });
     } finally {
       await ds.destroy();
     }
   });
 
-  it('creates the user table with its generated indexes (generated, not hand-waived)', () => {
+  it('creates the collection_media_approval table and rebuilds collection/collection_media (generated, not hand-waived)', () => {
     const newest = all[all.length - 1];
     const src = fs.readFileSync(path.join(MIGRATIONS_DIR, newest.file), 'utf8');
-    // Unlike a column addition to an existing table (which forces SQLite's
-    // create-temporary-table rebuild, the fingerprint the previous newest
-    // migration was checked against here), a brand new table is a plain
-    // CREATE TABLE. The generated signal instead is the exact column list
-    // plus the two unique indexes TypeORM derives from the entity's
-    // @Index({ unique: true }) decorators - a hand-written migration could
-    // easily miss one.
-    expect(src).toContain('CREATE TABLE "user"');
-    expect(src).toContain('CREATE UNIQUE INDEX');
-    expect(src).toContain('ON "user" ("plexId")');
-    expect(src).toContain('ON "user" ("plexUsername")');
+    // This migration both creates a brand new table (collection_media_approval,
+    // with its unique (collectionMediaId, userId) index) and adds a column to
+    // two existing tables, which SQLite can only do via TypeORM's
+    // create-temporary-table rebuild - a hand-written ALTER TABLE ADD COLUMN
+    // would add the column but never emit this rebuild, so its presence is
+    // the generated-not-hand-waived signal for the existing-table half.
+    expect(src).toContain('CREATE TABLE "collection_media_approval"');
+    expect(src).toContain(
+      'CREATE UNIQUE INDEX "IDX_92f69700771624e228094e87cd" ON "collection_media_approval" ("collectionMediaId", "userId")',
+    );
+    expect(src).toContain('CREATE TABLE "temporary_collection"');
+    expect(src).toContain('CREATE TABLE "temporary_collection_media"');
   });
 
   // We don't revert the whole chain: several pre-existing migrations have
@@ -199,7 +224,7 @@ describe('database migrations', () => {
       const has = async () =>
         (
           await ds.query(
-            `SELECT name FROM sqlite_master WHERE type='table' AND name='user'`,
+            `SELECT name FROM sqlite_master WHERE type='table' AND name='collection_media_approval'`,
           )
         ).length > 0;
       expect(await has()).toBe(true);

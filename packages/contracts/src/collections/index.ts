@@ -1,4 +1,6 @@
 export * from './approval-decision'
+export * from './approval-state'
+export * from './approval-vote'
 export * from './leftover-cleanup'
 export * from './logs'
 export * from './servarr-action'
