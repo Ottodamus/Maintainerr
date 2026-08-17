@@ -191,26 +191,42 @@ describe('database migrations', () => {
         notnull: 1,
         dflt_value: '0',
       });
+
+      // AddPlexMirrorSites: the mirror-site connection columns.
+      const plexMirrorSite = byName(await columns(ds, 'plex_mirror_site'));
+      expect(plexMirrorSite.siteName).toMatchObject({
+        type: 'varchar',
+        notnull: 1,
+      });
+      expect(plexMirrorSite.url).toMatchObject({
+        type: 'varchar',
+        notnull: 1,
+      });
+      expect(plexMirrorSite.token).toMatchObject({
+        type: 'varchar',
+        notnull: 1,
+      });
+      expect(plexMirrorSite.librarySectionId).toMatchObject({
+        type: 'varchar',
+        notnull: 1,
+      });
     } finally {
       await ds.destroy();
     }
   });
 
-  it('creates the collection_media_approval table and rebuilds collection/collection_media (generated, not hand-waived)', () => {
+  it('creates the plex_mirror_site table with its declared columns (generated, not hand-waived)', () => {
     const newest = all[all.length - 1];
     const src = fs.readFileSync(path.join(MIGRATIONS_DIR, newest.file), 'utf8');
-    // This migration both creates a brand new table (collection_media_approval,
-    // with its unique (collectionMediaId, userId) index) and adds a column to
-    // two existing tables, which SQLite can only do via TypeORM's
-    // create-temporary-table rebuild - a hand-written ALTER TABLE ADD COLUMN
-    // would add the column but never emit this rebuild, so its presence is
-    // the generated-not-hand-waived signal for the existing-table half.
-    expect(src).toContain('CREATE TABLE "collection_media_approval"');
-    expect(src).toContain(
-      'CREATE UNIQUE INDEX "IDX_92f69700771624e228094e87cd" ON "collection_media_approval" ("collectionMediaId", "userId")',
-    );
-    expect(src).toContain('CREATE TABLE "temporary_collection"');
-    expect(src).toContain('CREATE TABLE "temporary_collection_media"');
+    // A brand new, standalone table (no relations to rebuild) is the simplest
+    // shape migration:generate emits - the signal here is just that every
+    // entity-declared column made it in, since there's no rebuild dance to
+    // check for.
+    expect(src).toContain('CREATE TABLE "plex_mirror_site"');
+    expect(src).toContain('"siteName" varchar NOT NULL');
+    expect(src).toContain('"url" varchar NOT NULL');
+    expect(src).toContain('"token" varchar NOT NULL');
+    expect(src).toContain('"librarySectionId" varchar NOT NULL');
   });
 
   // We don't revert the whole chain: several pre-existing migrations have
@@ -224,7 +240,7 @@ describe('database migrations', () => {
       const has = async () =>
         (
           await ds.query(
-            `SELECT name FROM sqlite_master WHERE type='table' AND name='collection_media_approval'`,
+            `SELECT name FROM sqlite_master WHERE type='table' AND name='plex_mirror_site'`,
           )
         ).length > 0;
       expect(await has()).toBe(true);

@@ -35,6 +35,7 @@ import { SettingsDataService } from '../modules/settings/settings-data.service';
 import { StorageMetricsModule } from '../modules/storage-metrics/storage-metrics.module';
 import { VersionModule } from '../modules/version/version.module';
 import { AuthModule } from '../modules/auth/auth.module';
+import { PlexMirrorModule } from '../modules/plex-mirror/plex-mirror.module';
 import { UsersModule } from '../modules/users/users.module';
 import { AppController } from './app.controller';
 import { HealthController } from './health.controller';
@@ -53,6 +54,7 @@ import { resolveUiRootPath } from './config/uiPath';
     SettingsModule,
     UsersModule,
     AuthModule,
+    PlexMirrorModule,
     PlexApiModule,
     MediaServerModule,
     ExternalApiModule,

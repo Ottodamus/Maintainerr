@@ -191,12 +191,17 @@ const SettingsWrapper = () => {
       },
     )
 
-    // Tautulli is a Plex-only integration
+    // Tautulli and mirror sites are Plex-only
     if (mediaServerType === MediaServerType.PLEX) {
       baseRoutes.push({
         text: 'Tautulli',
         route: '/settings/tautulli',
         regex: /^\/settings\/tautulli$/,
+      })
+      baseRoutes.push({
+        text: 'Mirror Sites',
+        route: '/settings/plex-mirror',
+        regex: /^\/settings\/plex-mirror$/,
       })
     }
 

@@ -93,6 +93,9 @@ const settingsMetadataRoute = createLazyRoute(
 const settingsRadarrRoute = createLazyRoute(
   () => import('./components/Settings/Radarr'),
 )
+const settingsPlexMirrorRoute = createLazyRoute(
+  () => import('./components/Settings/PlexMirror'),
+)
 const settingsSeerrRoute = createLazyRoute(
   () => import('./components/Settings/Seerr'),
 )
@@ -301,6 +304,11 @@ const appRoutes: AppRoute[] = [
         path: 'radarr',
         lazy: settingsRadarrRoute.lazy,
         preload: settingsRadarrRoute.preload,
+      },
+      {
+        path: 'plex-mirror',
+        lazy: settingsPlexMirrorRoute.lazy,
+        preload: settingsPlexMirrorRoute.preload,
       },
       {
         path: 'seerr',
