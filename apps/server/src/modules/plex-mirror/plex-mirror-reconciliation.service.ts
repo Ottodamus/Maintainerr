@@ -1,20 +1,19 @@
 import { Injectable } from '@nestjs/common';
 import { CronExpression } from '@nestjs/schedule';
+import { getErrorMessage } from '../../utils/connection-error';
 import { MaintainerrLogger } from '../logging/logs.service';
 import { TaskBase } from '../tasks/task.base';
 import { TasksService } from '../tasks/tasks.service';
 import { PlexMirrorSiteService } from './plex-mirror-site.service';
+import { PlexMirrorSyncService } from './plex-mirror-sync.service';
 
 /**
- * Foundation-stage reconciliation: confirms each configured mirror site is
- * reachable on a schedule, self-healing operator visibility into a site that
- * dropped off the network (Syncthing outage, site down, token revoked).
- *
- * Deliberately does not yet resolve titles or push a per-site "Leaving Soon"
- * collection - that needs cross-server provider-id matching, which has no
- * existing precedent in this codebase and is scoped as a separate follow-up
- * once this foundation (site CRUD, connectivity test, this schedule) is
- * proven. See the mirror-sites plan for the phase split.
+ * Reconciles every configured mirror site on a schedule: pushes each
+ * visible, movie/show-level collection's current membership onto the site's
+ * own "Leaving Soon" collection (see PlexMirrorSyncService) and self-heals
+ * anything a site missed (Syncthing outage, site down, token revoked) since
+ * the sync itself is what proves reachability - there is no separate
+ * throwaway ping.
  */
 @Injectable()
 export class PlexMirrorReconciliationService extends TaskBase {
@@ -25,6 +24,7 @@ export class PlexMirrorReconciliationService extends TaskBase {
     protected readonly taskService: TasksService,
     protected readonly logger: MaintainerrLogger,
     private readonly plexMirrorSiteService: PlexMirrorSiteService,
+    private readonly plexMirrorSyncService: PlexMirrorSyncService,
   ) {
     logger.setContext(PlexMirrorReconciliationService.name);
     super(taskService, logger);
@@ -38,14 +38,14 @@ export class PlexMirrorReconciliationService extends TaskBase {
     }
 
     for (const site of sites) {
-      const result = await this.plexMirrorSiteService.testConnection(site);
-
-      if (result.status === 'OK') {
-        this.logger.debug(`Mirror site '${site.siteName}' is reachable`);
-      } else {
+      try {
+        await this.plexMirrorSyncService.syncSite(site);
+        this.logger.debug(`Synced mirror site '${site.siteName}'`);
+      } catch (error) {
         this.logger.warn(
-          `Mirror site '${site.siteName}' is unreachable: ${result.message}`,
+          `Failed to sync mirror site '${site.siteName}': ${getErrorMessage(error)}`,
         );
+        this.logger.debug(error);
       }
     }
   }

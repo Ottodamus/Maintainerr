@@ -210,23 +210,38 @@ describe('database migrations', () => {
         type: 'varchar',
         notnull: 1,
       });
+
+      // AddPlexMirrorCollectionLink: per-site BoxSet tracking columns.
+      const mirrorLink = byName(
+        await columns(ds, 'plex_mirror_collection_link'),
+      );
+      expect(mirrorLink.plexMirrorSiteId).toMatchObject({
+        type: 'INTEGER',
+        notnull: 1,
+      });
+      expect(mirrorLink.collectionId).toMatchObject({
+        type: 'INTEGER',
+        notnull: 1,
+      });
+      expect(mirrorLink.mirrorRatingKey).toMatchObject(nullableVarchar);
     } finally {
       await ds.destroy();
     }
   });
 
-  it('creates the plex_mirror_site table with its declared columns (generated, not hand-waived)', () => {
+  it('creates the plex_mirror_collection_link table with its unique index (generated, not hand-waived)', () => {
     const newest = all[all.length - 1];
     const src = fs.readFileSync(path.join(MIGRATIONS_DIR, newest.file), 'utf8');
-    // A brand new, standalone table (no relations to rebuild) is the simplest
-    // shape migration:generate emits - the signal here is just that every
-    // entity-declared column made it in, since there's no rebuild dance to
-    // check for.
-    expect(src).toContain('CREATE TABLE "plex_mirror_site"');
-    expect(src).toContain('"siteName" varchar NOT NULL');
-    expect(src).toContain('"url" varchar NOT NULL');
-    expect(src).toContain('"token" varchar NOT NULL');
-    expect(src).toContain('"librarySectionId" varchar NOT NULL');
+    // Another brand new, standalone table - the generated signal is the exact
+    // column list plus the unique (plexMirrorSiteId, collectionId) index
+    // TypeORM derives from the entity's @Index decorator.
+    expect(src).toContain('CREATE TABLE "plex_mirror_collection_link"');
+    expect(src).toContain('"plexMirrorSiteId" integer NOT NULL');
+    expect(src).toContain('"collectionId" integer NOT NULL');
+    expect(src).toContain('"mirrorRatingKey" varchar');
+    expect(src).toContain(
+      'ON "plex_mirror_collection_link" ("plexMirrorSiteId", "collectionId")',
+    );
   });
 
   // We don't revert the whole chain: several pre-existing migrations have
@@ -240,7 +255,7 @@ describe('database migrations', () => {
       const has = async () =>
         (
           await ds.query(
-            `SELECT name FROM sqlite_master WHERE type='table' AND name='plex_mirror_site'`,
+            `SELECT name FROM sqlite_master WHERE type='table' AND name='plex_mirror_collection_link'`,
           )
         ).length > 0;
       expect(await has()).toBe(true);
