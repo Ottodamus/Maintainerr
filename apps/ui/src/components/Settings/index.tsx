@@ -1,4 +1,4 @@
-import { MediaServerType } from '@maintainerr/contracts'
+import { MediaServerType, UserRole } from '@maintainerr/contracts'
 import { useEffect, useMemo, useState } from 'react'
 import {
   Navigate,
@@ -6,6 +6,7 @@ import {
   useLocation,
   useOutletContext,
 } from 'react-router-dom'
+import { useCurrentUser } from '../../api/auth'
 import {
   useServarrSettings,
   useSettings,
@@ -121,6 +122,7 @@ const SettingsWrapper = () => {
   const { t } = useLingui()
   const location = useLocation()
   const { data: settings, isLoading, error } = useSettings()
+  const { data: currentUser } = useCurrentUser()
   const [hasDismissedSetupWelcome, setHasDismissedSetupWelcome] =
     useState(false)
 
@@ -227,6 +229,17 @@ const SettingsWrapper = () => {
       })
     }
 
+    // Only admins can invite or manage other users; the backend enforces
+    // this too, but there's no reason to show the tab to someone who would
+    // just get a 403 from every request it makes.
+    if (currentUser?.role === UserRole.ADMIN) {
+      baseRoutes.push({
+        text: 'Users',
+        route: '/settings/users',
+        regex: /^\/settings\/users$/,
+      })
+    }
+
     baseRoutes.push(
       {
         text: t`Notifications`,
@@ -251,7 +264,7 @@ const SettingsWrapper = () => {
     )
 
     return baseRoutes
-  }, [isLoading, mediaServerType, hasArrConfigured, t])
+  }, [isLoading, mediaServerType, hasArrConfigured, currentUser?.role, t])
 
   const isMediaServerSetupComplete = hasCompletedMediaServerSetup(settings)
   const hasSelectedMediaServer = hasSelectedMediaServerType(settings)

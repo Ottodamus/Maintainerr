@@ -1,4 +1,4 @@
-import { MediaServerType } from '@maintainerr/contracts'
+import { MediaServerType, UserDto, UserRole } from '@maintainerr/contracts'
 import { act, fireEvent, render, screen } from '../../test-utils/render'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { INTERACTION_DEBOUNCE_MS } from '../../utils/uiBehavior'
@@ -35,10 +35,15 @@ type MockSettingsResult = {
 
 let currentSettingsResult: MockSettingsResult
 let currentServarrSettings: { data: unknown[] } = { data: [] }
+let currentUser: UserDto | undefined
 
 vi.mock('../../api/settings', () => ({
   useSettings: () => currentSettingsResult,
   useServarrSettings: () => currentServarrSettings,
+}))
+
+vi.mock('../../api/auth', () => ({
+  useCurrentUser: () => ({ data: currentUser, isLoading: false }),
 }))
 
 vi.mock('../Common/Alert', () => ({
@@ -98,6 +103,7 @@ describe('SettingsWrapper', () => {
       error: undefined,
     }
     currentServarrSettings = { data: [] }
+    currentUser = undefined
   })
 
   afterEach(() => {
@@ -344,6 +350,83 @@ describe('SettingsWrapper', () => {
         .getByRole('link', { name: 'Download client' })
         .getAttribute('href'),
     ).toBe('/settings/download-client')
+  })
+
+  it('hides the Users tab from a signed-out visitor', () => {
+    currentSettingsResult = {
+      data: {
+        media_server_type: MediaServerType.JELLYFIN,
+        plex_auth_token: null,
+        jellyfin_url: 'http://jellyfin.local',
+        jellyfin_api_key: 'token',
+      },
+      isLoading: false,
+      error: undefined,
+    }
+    currentUser = undefined
+
+    const { container } = render(<SettingsWrapper />)
+
+    expect(getDesktopTabLabels(container)).not.toContain('Users')
+  })
+
+  it('hides the Users tab from a non-admin', () => {
+    currentSettingsResult = {
+      data: {
+        media_server_type: MediaServerType.JELLYFIN,
+        plex_auth_token: null,
+        jellyfin_url: 'http://jellyfin.local',
+        jellyfin_api_key: 'token',
+      },
+      isLoading: false,
+      error: undefined,
+    }
+    currentUser = {
+      id: 1,
+      plexId: '1',
+      plexUsername: 'viewer',
+      email: null,
+      thumb: null,
+      role: UserRole.VIEWER,
+      allowed: true,
+      lastLoginAt: null,
+      createdAt: new Date(),
+    }
+
+    const { container } = render(<SettingsWrapper />)
+
+    expect(getDesktopTabLabels(container)).not.toContain('Users')
+  })
+
+  it('shows the Users tab to an admin', () => {
+    currentSettingsResult = {
+      data: {
+        media_server_type: MediaServerType.JELLYFIN,
+        plex_auth_token: null,
+        jellyfin_url: 'http://jellyfin.local',
+        jellyfin_api_key: 'token',
+      },
+      isLoading: false,
+      error: undefined,
+    }
+    currentUser = {
+      id: 1,
+      plexId: '1',
+      plexUsername: 'admin',
+      email: null,
+      thumb: null,
+      role: UserRole.ADMIN,
+      allowed: true,
+      lastLoginAt: null,
+      createdAt: new Date(),
+    }
+
+    const { container } = render(<SettingsWrapper />)
+
+    expect(getDesktopTabLabels(container)).toContain('Users')
+    expect(
+      screen.getByRole('link', { name: 'Users' }).getAttribute('href'),
+    ).toBe('/settings/users')
   })
 
   it('shows an error toast when a blocked settings tab is clicked during first setup', () => {
