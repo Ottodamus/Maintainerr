@@ -1,8 +1,10 @@
 import { DownloadIcon, RefreshIcon } from '@heroicons/react/solid'
-import { useMemo, useState } from 'react'
+import { Trans, useLingui } from '@lingui/react/macro'
+import { use, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useSettingsOutletContext } from '..'
 import { usePatchSettings } from '../../../api/settings'
+import LocaleContext from '../../../contexts/locale-context'
 import GetApiHandler from '../../../utils/ApiHandler'
 import Button from '../../Common/Button'
 import DocsButton from '../../Common/DocsButton'
@@ -15,13 +17,17 @@ import {
   useSettingsFeedback,
 } from '../useSettingsFeedback'
 import DatabaseBackupModal from './DatabaseBackupModal'
+import LanguageSelector from './LanguageSelector'
 
 interface GeneralSettingsFormValues {
   applicationUrl: string
   apikey: string
+  // Not part of the settings payload - applied on save, stored per browser.
+  locale: string
 }
 
 const MainSettings = () => {
+  const { t } = useLingui()
   const [showDownloadModal, setShowDownloadModal] = useState(false)
   const {
     feedback,
@@ -32,35 +38,44 @@ const MainSettings = () => {
     showError,
     clear,
     clearError,
-  } = useSettingsFeedback('General settings')
+  } = useSettingsFeedback({
+    updated: t`General settings updated`,
+    updateError: t`General settings could not be updated`,
+  })
   const { settings } = useSettingsOutletContext()
+  const { locale } = use(LocaleContext)
 
   const initialValues = useMemo<GeneralSettingsFormValues>(
     () => ({
       applicationUrl: settings.applicationUrl ?? '',
       apikey: settings.apikey ?? '',
+      locale,
     }),
-    [settings.apikey, settings.applicationUrl],
+    [settings.apikey, settings.applicationUrl, locale],
   )
 
   return (
     <>
-      <title>General settings - Maintainerr</title>
+      <title>{t`General settings - Maintainerr`}</title>
       <div className="h-full w-full">
-        <div className="section h-full w-full">
-          <h3 className="heading">General Settings</h3>
-          <p className="description">Configure global settings</p>
+        <div className="section mb-2 h-full w-full">
+          <h3 className="heading">
+            <Trans>General Settings</Trans>
+          </h3>
+          <p className="description">
+            <Trans>Configure global settings</Trans>
+          </p>
         </div>
         <SettingsFeedbackAlert feedback={feedback} />
 
         {showDownloadModal && (
           <DatabaseBackupModal
             onClose={() => setShowDownloadModal(false)}
-            onDownloaded={() => showSuccess('Database backup downloaded')}
+            onDownloaded={() => showSuccess(t`Database backup downloaded`)}
           />
         )}
 
-        <div className="section">
+        <div className="section my-2">
           <MainSettingsForm
             key={`${initialValues.applicationUrl}:${initialValues.apikey}`}
             initialValues={initialValues}
@@ -95,7 +110,9 @@ const MainSettingsForm = ({
   onUpdated: () => void
   onUpdateError: () => void
 }) => {
+  const { t } = useLingui()
   const { mutateAsync: updateSettings, isPending } = usePatchSettings()
+  const { setLocale } = use(LocaleContext)
 
   const { register, handleSubmit, reset, getValues } =
     useForm<GeneralSettingsFormValues>({
@@ -107,8 +124,13 @@ const MainSettingsForm = ({
   const submit = async (data: GeneralSettingsFormValues) => {
     onClearError()
 
+    // The locale rides along in the form so it follows the usual Save flow,
+    // but it is a browser preference rather than a server setting.
+    const { locale, ...settingsPayload } = data
+
     try {
-      await updateSettings(data)
+      await updateSettings(settingsPayload)
+      await setLocale(locale)
       reset(data)
       onUpdated()
     } catch {
@@ -130,6 +152,7 @@ const MainSettingsForm = ({
         {
           applicationUrl: getValues('applicationUrl'),
           apikey: key,
+          locale: getValues('locale'),
         },
         {
           keepValues: true,
@@ -146,7 +169,7 @@ const MainSettingsForm = ({
     <form onSubmit={handleSubmit(submit)}>
       <div className="form-row">
         <label htmlFor="hostname" className="text-label">
-          Hostname
+          <Trans>Hostname</Trans>
         </label>
         <div className="form-input">
           <div className="form-input-field">
@@ -161,7 +184,7 @@ const MainSettingsForm = ({
 
       <div className="form-row">
         <label htmlFor="api-key" className="text-label">
-          API key
+          <Trans>API key</Trans>
         </label>
         <div className="form-input">
           <div className="form-input-field">
@@ -173,7 +196,7 @@ const MainSettingsForm = ({
                 {...register('apikey', { onChange: onClearError })}
               />
               <button
-                aria-label="Regenerate API key"
+                aria-label={t`Regenerate API key`}
                 onClick={(e) => {
                   e.preventDefault()
                   void regenerateApi()
@@ -186,6 +209,9 @@ const MainSettingsForm = ({
           </div>
         </div>
       </div>
+
+      <LanguageSelector field={register('locale')} />
+
       <div className="actions mt-5 w-full">
         <PageControlRow
           className="mb-0"
@@ -201,7 +227,9 @@ const MainSettingsForm = ({
                   onClick={onOpenBackup}
                 >
                   <DownloadIcon />
-                  <span>Backup Database</span>
+                  <span>
+                    <Trans>Backup Database</Trans>
+                  </span>
                 </Button>
               </span>
             </>

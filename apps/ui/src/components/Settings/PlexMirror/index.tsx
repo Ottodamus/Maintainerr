@@ -33,9 +33,7 @@ const PlexMirrorSettings = () => {
   const [settingsModalActive, setSettingsModalActive] = useState<
     IPlexMirrorSite | boolean
   >()
-  const { feedback, clear, showError, showInfo } = useSettingsFeedback(
-    'Plex mirror site settings',
-  )
+  const { feedback, clear, showError, showInfo } = useSettingsFeedback()
 
   const handleSettingsSaved = (setting: IPlexMirrorSite) => {
     const newSettings = [...settings]

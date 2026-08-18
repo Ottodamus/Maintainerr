@@ -9,6 +9,7 @@ import { TautulliApiModule } from '../api/tautulli-api/tautulli-api.module';
 import { CollectionLog } from '../collections/entities/collection_log.entities';
 import { CollectionLogCleanerService } from '../collections/tasks/collection-log-cleaner.service';
 import { MetadataModule } from '../metadata/metadata.module';
+import { OverlaysModule } from '../overlays/overlays.module';
 import { Exclusion } from '../rules/entities/exclusion.entities';
 import { RuleGroup } from '../rules/entities/rule-group.entities';
 import { RulesModule } from '../rules/rules.module';
@@ -50,6 +51,7 @@ import { RecentlyHandledMediaService } from './recently-handled-media.service';
     ActionsModule,
     UsersModule,
     forwardRef(() => RulesModule),
+    OverlaysModule,
   ],
   providers: [
     CollectionsService,

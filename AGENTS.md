@@ -29,6 +29,7 @@ For the broader system architecture map, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 **Task-specific - read only when the task calls for it (don't load them every session):**
 
+- [i18n.instructions.md](.github/instructions/i18n.instructions.md) - when adding or changing any user-facing text in the UI: which macro to use, what must never be translated, and the ICU quoting trap.
 - [release-review.instructions.md](.github/instructions/release-review.instructions.md) - when auditing a release candidate before tagging.
 - [ARCHITECTURE.md](ARCHITECTURE.md) - before changing cross-module boundaries.
 
@@ -324,23 +325,10 @@ When working with these integrations:
 
 ## External API Documentation
 
-Reference the following OpenAPI specifications and API documentation when working with external service integrations:
-
-### Media Management Services
-
-- **Sonarr**: [OpenAPI Specification](https://raw.githubusercontent.com/Sonarr/Sonarr/develop/src/Sonarr.Api.V3/openapi.json)
-- **Radarr**: [OpenAPI Specification](https://raw.githubusercontent.com/Radarr/Radarr/develop/src/Radarr.Api.V3/openapi.json)
-- **Tautulli**: [API Reference Documentation](https://docs.tautulli.com/extending-tautulli/api-reference)
-
-### Request Management Services
-
-- **Seerr**: [Documentation](https://docs.seerr.dev/) | [Source](https://github.com/seerr-team/seerr)
-
-### Media Server Services
-
-- **Plex**: [Official PMS Reference](https://developer.plex.tv/pms/) | [OpenAPI Specification (community)](https://raw.githubusercontent.com/LukasParke/plex-api-spec/refs/heads/main/plex-api-spec.yaml) | [Additional Documentation](https://www.plexopedia.com/plex-media-server/api/)
-
-These specifications provide comprehensive type definitions and endpoint documentation for creating robust integrations with proper TypeScript typing.
+Do not add API doc URLs here. Machine-readable OpenAPI specs live in `SPECS` in
+[tools/api-spec-drift.mjs](tools/api-spec-drift.mjs), which fetches each one
+weekly so the list stays verified. References that have no fetchable spec live in
+[implementation.instructions.md](.github/instructions/implementation.instructions.md).
 
 ## Testing Guidelines
 
@@ -392,7 +380,7 @@ degrade gracefully.
 
 ### Environment Setup
 
-- **Node.js**: Version 22.13.0+ or 24.11.0+ (the floor is Node 22, raised from TypeORM 1.0.0's 20.19 requirement by the `@eslint-react` lint toolchain, which needs Node 22+; the Docker image and devcontainer ship Node 26)
+- **Node.js**: 22.22.2+, 24.15.0+, or 26+ (root `package.json` `engines` is the source of truth; Docker and the devcontainer ship Node 26)
 - **Package Manager**: Yarn 4.11 (managed via corepack)
 - **Data Directory**: Requires `data/` folder with proper permissions for development
 

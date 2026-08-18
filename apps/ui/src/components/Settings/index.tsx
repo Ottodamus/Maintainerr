@@ -26,6 +26,7 @@ import {
   showMediaServerSetupRequiredToast,
 } from '../Layout/MediaServerSetupGuard'
 import SettingsTabs, { SettingsRoute } from './Tabs'
+import { Trans, useLingui } from '@lingui/react/macro'
 
 const mediaServerTabContent = (label?: string) => {
   if (label) {
@@ -117,6 +118,7 @@ export const useSettingsOutletContext = () =>
   useOutletContext<SettingsOutletContext>()
 
 const SettingsWrapper = () => {
+  const { t } = useLingui()
   const location = useLocation()
   const { data: settings, isLoading, error } = useSettings()
   const [hasDismissedSetupWelcome, setHasDismissedSetupWelcome] =
@@ -146,7 +148,7 @@ const SettingsWrapper = () => {
   const settingsRoutes: SettingsRoute[] = useMemo(() => {
     const baseRoutes: SettingsRoute[] = [
       {
-        text: 'General',
+        text: t`General`,
         route: '/settings/main',
         regex: /^\/settings\/main$/,
       },
@@ -180,7 +182,7 @@ const SettingsWrapper = () => {
         regex: /^\/settings\/sportarr$/,
       },
       {
-        text: 'Metadata',
+        text: t`Metadata`,
         route: '/settings/metadata',
         regex: /^\/settings\/metadata$/,
       },
@@ -219,7 +221,7 @@ const SettingsWrapper = () => {
     // configured.
     if (hasArrConfigured) {
       baseRoutes.push({
-        text: 'Download client',
+        text: t`Download client`,
         route: '/settings/download-client',
         regex: /^\/settings\/download-client$/,
       })
@@ -227,29 +229,29 @@ const SettingsWrapper = () => {
 
     baseRoutes.push(
       {
-        text: 'Notifications',
+        text: t`Notifications`,
         route: '/settings/notifications',
         regex: /^\/settings\/notifications$/,
       },
       {
-        text: 'Logs',
+        text: t`Logs`,
         route: '/settings/logs',
         regex: /^\/settings\/logs$/,
       },
       {
-        text: 'Jobs',
+        text: t`Jobs`,
         route: '/settings/jobs',
         regex: /^\/settings\/jobs$/,
       },
       {
-        text: 'About',
+        text: t`About`,
         route: '/settings/about',
         regex: /^\/settings\/about$/,
       },
     )
 
     return baseRoutes
-  }, [isLoading, mediaServerType, hasArrConfigured])
+  }, [isLoading, mediaServerType, hasArrConfigured, t])
 
   const isMediaServerSetupComplete = hasCompletedMediaServerSetup(settings)
   const hasSelectedMediaServer = hasSelectedMediaServerType(settings)
@@ -279,7 +281,10 @@ const SettingsWrapper = () => {
           <SettingsTabs settingsRoutes={settingsRoutes} allEnabled={false} />
         </div>
         <div className="mt-10 flex">
-          <Alert type="error" title="There was a problem loading settings." />
+          <Alert
+            type="error"
+            title={t`There was a problem loading settings.`}
+          />
         </div>
       </>
     )
@@ -313,7 +318,7 @@ const SettingsWrapper = () => {
       <>
         {shouldShowSetupWelcome ? (
           <Modal
-            title="Welcome to Maintainerr!"
+            title={t`Welcome to Maintainerr!`}
             backgroundClickable={false}
             size="md"
             footerActions={
@@ -322,23 +327,27 @@ const SettingsWrapper = () => {
                 className="ml-3"
                 onClick={() => setHasDismissedSetupWelcome(true)}
               >
-                Let&apos;s get started
+                <Trans>Let&apos;s get started</Trans>
               </Button>
             }
           >
             <div className="space-y-4 text-zinc-100">
               <div className="rounded-md border border-info-500/40 bg-info-900/30 p-4 backdrop-blur-sm">
                 <p className="text-base font-medium text-info-100">
-                  Connect your media server to finish setup.
+                  <Trans>Connect your media server to finish setup.</Trans>
                 </p>
                 <p className="mt-2 leading-6 text-info-200">
-                  Choose your media server, confirm the connection, and then you
-                  can continue configuring the rest of Maintainerr.
+                  <Trans>
+                    Choose your media server, confirm the connection, and then
+                    you can continue configuring the rest of Maintainerr.
+                  </Trans>
                 </p>
               </div>
               <p className="text-sm leading-6 text-zinc-400">
-                The Logs page stays available during setup if you need to
-                troubleshoot your connection.
+                <Trans>
+                  The Logs page stays available during setup if you need to
+                  troubleshoot your connection.
+                </Trans>
               </p>
             </div>
           </Modal>

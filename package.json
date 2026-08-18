@@ -1,6 +1,6 @@
 {
   "name": "maintainerr",
-  "version": "3.22.1",
+  "version": "3.23.0",
   "private": true,
   "packageManager": "yarn@4.17.1",
   "repository": {
@@ -15,6 +15,9 @@
     "lint": "turbo lint",
     "format": "turbo format",
     "format:changed": "node tools/format-changed.mjs",
+    "i18n:validate": "node tools/i18n/validate-catalogs.mjs",
+    "i18n:verify": "node tools/i18n/verify-locale-switch.mjs",
+    "i18n:back-translate": "node tools/i18n/back-translate.mjs",
     "format:check": "turbo format:check",
     "knip": "knip",
     "check-types": "turbo check-types",
@@ -27,7 +30,7 @@
     "packages/*"
   ],
   "engines": {
-    "node": "^22.13.0 || >=24.11.0"
+    "node": "^22.22.2 || ^24.15.0 || >=26.0.0"
   },
   "devDependencies": {
     "@semantic-release/changelog": "^7.0.0",
@@ -35,10 +38,12 @@
     "@semantic-release/exec": "^7.1.0",
     "@semantic-release/git": "^11.0.1",
     "@types/node": "^26.2.0",
-    "knip": "^6.32.0",
+    "knip": "^6.32.2",
+    "pofile-ts": "^4.0.3",
     "semantic-release": "^25.0.9",
-    "turbo": "^2.10.9",
-    "typescript": "^6.0.3"
+    "turbo": "^2.10.10",
+    "typescript": "^6.0.3",
+    "yaml": "^2.9.0"
   },
   "release": {
     "plugins": [
@@ -100,6 +105,6 @@
     "multer": "2.2.0",
     "linkify-it": "5.0.2",
     "js-yaml@5.2.1": "5.2.3",
-    "nodemailer": "9.0.4"
+    "nodemailer": "9.0.5"
   }
 }

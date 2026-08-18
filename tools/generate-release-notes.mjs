@@ -8,11 +8,17 @@ const MAX_MIGRATIONS_TOTAL_CHARS = 12000;
 const MAX_PR_BODY_CHARS = 400;
 const MAX_ORPHAN_BODY_CHARS = 300;
 const MIGRATION_PATH_PREFIX = "apps/server/src/database/migrations/";
-const MODELS_ENDPOINT = "https://models.github.ai/inference/chat/completions";
+import {
+  DEFAULT_REASONING_EFFORT,
+  callModel,
+  hasModelAccess,
+} from "./ai/model-client.mjs";
 const DEP_SUBJECT_RE = /^build\(deps(?:-dev)?\):/i;
 const CHORE_SUBJECT_RE = /^chore(?:\([^)]*\))?!?:/i;
 const SYNC_SUBJECT_RE = /^chore:\s*sync\s+development\s+to\s+main/i;
-const DEP_PKG_RE = /bump\s+([^\s]+)/i;
+// Grouped updates read "bump the nestjs group with 4 updates", so the optional
+// article has to be consumed or every grouped bump is listed as "the".
+const DEP_PKG_RE = /bump\s+(?:the\s+)?([^\s]+)/i;
 const BOT_LOGIN_RE = /\[bot\]$/i;
 
 const REC_SEP = String.fromCharCode(0x1e);
@@ -27,10 +33,12 @@ const {
   GITHUB_REPOSITORY: repo = "",
   GITHUB_TOKEN,
   GH_TOKEN,
-  RELEASE_NOTES_MODEL = "openai/gpt-4o",
+  RELEASE_NOTES_MODEL = process.env.AI_MODEL || "gemini-3.1-flash-lite",
 } = process.env;
 
-const modelToken = GITHUB_TOKEN || GH_TOKEN || "";
+// For api.github.com, not for the model endpoint - that one reads
+// AI_MODEL_API_KEY through the shared client.
+const githubToken = GITHUB_TOKEN || GH_TOKEN || "";
 
 const log = (msg) => process.stderr.write(`[release-notes] ${msg}\n`);
 
@@ -88,6 +96,39 @@ const extractNewContributorsSection = (body = "") => {
   const rest = body.slice(start);
   const nextSection = rest.search(/\n## |\n\*\*Full Changelog/);
   return (nextSection < 0 ? rest : rest.slice(0, nextSection)).trim();
+};
+
+/**
+ * GitHub's generate-notes counts bots as contributors, so a translation bot
+ * lands in a section meant to credit people. The local builder already skips
+ * them; this makes the API path agree. Drops the heading too when nothing but
+ * bots was listed, rather than leaving an empty section behind.
+ */
+const withoutBotContributors = (section = "") => {
+  if (!section) return "";
+
+  const kept = [];
+  let people = 0;
+
+  for (const line of section.split("\n")) {
+    const trimmed = line.trim();
+    const at = trimmed.indexOf("@");
+
+    if (!trimmed.startsWith("*") || at === -1) {
+      kept.push(line);
+      continue;
+    }
+
+    const after = trimmed.slice(at + 1);
+    const space = after.indexOf(" ");
+    const login = space === -1 ? after : after.slice(0, space);
+    if (isBotLogin(login)) continue;
+
+    people += 1;
+    kept.push(line);
+  }
+
+  return people ? kept.join("\n").trim() : "";
 };
 
 export const buildLocalNewContributorsSection = (
@@ -165,7 +206,7 @@ export const buildLocalNewContributorsSection = (
 
 const fetchNewContributors = async (prMeta) => {
   const fallback = buildLocalNewContributorsSection(prMeta);
-  if (!modelToken || !repo || !nextVersion || !effectiveLastTag) {
+  if (!githubToken || !repo || !nextVersion || !effectiveLastTag) {
     return fallback;
   }
   try {
@@ -174,7 +215,7 @@ const fetchNewContributors = async (prMeta) => {
       {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${modelToken}`,
+          Authorization: `Bearer ${githubToken}`,
           Accept: "application/vnd.github+json",
           "X-GitHub-Api-Version": "2022-11-28",
           "Content-Type": "application/json",
@@ -191,7 +232,10 @@ const fetchNewContributors = async (prMeta) => {
       return fallback;
     }
     const data = await res.json();
-    return extractNewContributorsSection(data.body || "") || fallback;
+    return (
+      withoutBotContributors(extractNewContributorsSection(data.body || "")) ||
+      fallback
+    );
   } catch (err) {
     log(`generate-notes fetch failed: ${err.message}`);
     return fallback;
@@ -212,7 +256,7 @@ const parseCommits = () => {
   const raw = runGit([
     "log",
     range,
-    `--format=%s${FIELD_SEP}%b${REC_SEP}`,
+    `--format=%H${FIELD_SEP}%s${FIELD_SEP}%b${REC_SEP}`,
     "--no-merges",
     "-n",
     String(MAX_COMMITS),
@@ -222,10 +266,11 @@ const parseCommits = () => {
     .map((c) => c.trim())
     .filter(Boolean)
     .map((entry) => {
-      const [subject, body = ""] = entry.split(FIELD_SEP);
+      const [sha, subject, body = ""] = entry.split(FIELD_SEP);
       const prMatch = subject.match(/\(#(\d+)\)\s*$/);
       const cleanedBody = cleanCommitBody(body);
       return {
+        sha,
         subject,
         pr: prMatch ? Number(prMatch[1]) : null,
         cleanSubject: subject.replace(/\s*\(#\d+\)\s*$/, ""),
@@ -235,6 +280,73 @@ const parseCommits = () => {
             : cleanedBody,
       };
     });
+};
+
+const MERGE_PR_PREFIX = "Merge pull request #";
+// A sync merge carries a whole branch rather than one pull request's work, so
+// it must never become the attribution for the commits flowing through it.
+const SYNC_HEAD_BRANCHES = new Set(["development", "main"]);
+
+/** The pull request number from a `Merge pull request #N from owner/branch` subject. */
+const parseMergePr = (subject = "") => {
+  if (!subject.startsWith(MERGE_PR_PREFIX)) return null;
+
+  const rest = subject.slice(MERGE_PR_PREFIX.length);
+  const spaceAt = rest.indexOf(" ");
+  const number = Number(spaceAt === -1 ? rest : rest.slice(0, spaceAt));
+  if (!Number.isInteger(number) || number <= 0) return null;
+
+  const fromAt = rest.indexOf(" from ");
+  const headRef =
+    fromAt === -1 ? "" : rest.slice(fromAt + " from ".length).trim();
+  const slashAt = headRef.indexOf("/");
+  const branch = slashAt === -1 ? headRef : headRef.slice(slashAt + 1);
+  if (SYNC_HEAD_BRANCHES.has(branch)) return null;
+
+  return number;
+};
+
+/**
+ * A commit only carries `(#NNN)` when its pull request was squash-merged. One
+ * merged with a merge commit leaves the number on the merge commit, which
+ * `--no-merges` drops, and the bullet then reaches the model with no PR at all
+ * - which is when it starts borrowing a neighbouring number. Walk the ancestry
+ * path instead and take the first real pull-request merge that contains it.
+ */
+const resolvePrNumbers = (commits) => {
+  const orphans = commits.filter((c) => !c.pr && c.sha);
+  if (!orphans.length) return commits;
+
+  let resolved = 0;
+  for (const commit of orphans) {
+    let merges = "";
+    try {
+      merges = runGit([
+        "log",
+        "--ancestry-path",
+        "--merges",
+        "--reverse",
+        "--format=%s",
+        `${commit.sha}..${nextHead}`,
+      ]);
+    } catch {
+      continue;
+    }
+
+    for (const subject of merges.split("\n")) {
+      const number = parseMergePr(subject.trim());
+      if (number) {
+        commit.pr = number;
+        resolved += 1;
+        break;
+      }
+    }
+  }
+
+  log(
+    `resolved ${resolved}/${orphans.length} commits without a squash-merge suffix to a pull request`,
+  );
+  return commits;
 };
 
 const changedFiles = () => {
@@ -325,6 +437,37 @@ const partitionCommits = (commits) => {
   return { deps, syncs, chores, main };
 };
 
+/**
+ * SYNC_SUBJECT_RE only catches a sync squash that kept the pull request title.
+ * When a sync pull request holds exactly one commit, GitHub squashes it under
+ * that commit's own message instead, so the change lands in the range twice:
+ * the original, and a twin carrying the sync pull request's number. The model
+ * is then handed the same work under two numbers and cites both, which is how
+ * 3.23.0 credited the retry fix to #3529, the sync pull request itself.
+ *
+ * Keep the oldest occurrence of a subject. A squash can only ever be newer than
+ * what it squashed, so the survivor is the real commit. Applied to the
+ * model-facing commits only: dependency and translation bumps legitimately
+ * repeat a subject across releases and are counted, not described.
+ */
+const dropSyncSquashTwins = (commits) => {
+  const seen = new Set();
+  const kept = [];
+
+  // git log is newest first, so walking backwards reaches the original first.
+  for (let i = commits.length - 1; i >= 0; i -= 1) {
+    const commit = commits[i];
+    if (seen.has(commit.cleanSubject)) continue;
+    seen.add(commit.cleanSubject);
+    kept.push(commit);
+  }
+
+  kept.reverse();
+  const dropped = commits.length - kept.length;
+  if (dropped) log(`dropped ${dropped} sync-squash duplicate(s)`);
+  return kept;
+};
+
 const depSummary = (deps) => {
   if (!deps.length) return null;
   const pkgs = new Set();
@@ -335,7 +478,10 @@ const depSummary = (deps) => {
   return { count: deps.length, pkgs: [...pkgs] };
 };
 
-const fallbackNotes = (commits, migrations) => {
+// Takes the already-partitioned commits rather than re-deriving them, so the
+// fallback describes exactly what the model would have been given. Re-running
+// partitionCommits here silently skipped the sync-squash dedupe.
+const fallbackNotes = ({ main, deps }, migrations) => {
   const groups = {
     feat: [],
     fix: [],
@@ -345,7 +491,6 @@ const fallbackNotes = (commits, migrations) => {
     test: [],
     other: [],
   };
-  const { deps, main } = partitionCommits(commits);
   for (const c of main) {
     const m = c.subject.match(/^(\w+)(\(.+?\))?!?:/);
     const type = m && groups[m[1]] ? m[1] : "other";
@@ -387,23 +532,18 @@ const stripOuterFence = (s) => {
   return trimmed;
 };
 
-const callModel = async (payload) => {
-  const res = await fetch(MODELS_ENDPOINT, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${modelToken}`,
-      "Content-Type": "application/json",
-      Accept: "application/vnd.github+json",
-      "X-GitHub-Api-Version": "2022-11-28",
-    },
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok) {
-    throw new Error(`GitHub Models ${res.status}: ${await res.text()}`);
-  }
-  const data = await res.json();
-  return stripOuterFence(data.choices?.[0]?.message?.content ?? "");
-};
+const generateNotes = async (messages) =>
+  stripOuterFence(
+    await callModel(messages, {
+      model: RELEASE_NOTES_MODEL,
+      // Rule 3 is the one this tool gets wrong when it guesses. Checking every
+      // citation against the commit list is reasoning work, and this runs once
+      // per release, so buy the thinking rather than the cheapest answer.
+      // AI_MODEL_REASONING_EFFORT still wins, so dialling it back stays a
+      // repository-variable change rather than a pull request.
+      reasoningEffort: DEFAULT_REASONING_EFFORT || "high",
+    }),
+  );
 
 const buildPrompt = ({ main, deps, syncs, prMeta, migrationDetails }) => {
   const emittedPrBodies = new Set();
@@ -471,10 +611,15 @@ const buildPrompt = ({ main, deps, syncs, prMeta, migrationDetails }) => {
 };
 
 const main = async () => {
-  const commits = parseCommits();
+  const commits = resolvePrNumbers(parseCommits());
   log(`range=${range} commits=${commits.length} model=${RELEASE_NOTES_MODEL}`);
   const header = buildHeader();
-  const { deps, syncs, main: mainCommits } = partitionCommits(commits);
+  const {
+    deps,
+    syncs,
+    main: partitionedMain,
+  } = partitionCommits(commits);
+  const mainCommits = dropSyncSquashTwins(partitionedMain);
   const prMeta = fetchPrMeta(mainCommits);
   const newContribs = await fetchNewContributors(prMeta);
   const footer = newContribs ? `\n\n${newContribs}\n` : "";
@@ -489,10 +634,10 @@ const main = async () => {
   const migrations = files.filter((f) => f.startsWith(MIGRATION_PATH_PREFIX));
   const migrationDetails = readMigrationContents(migrations);
 
-  if (!modelToken) {
-    log("no GITHUB_TOKEN/GH_TOKEN available; emitting fallback notes");
+  if (!hasModelAccess()) {
+    log("no AI_MODEL_API_KEY available; emitting fallback notes");
     process.stdout.write(
-      `${header}${fallbackNotes(commits, migrations)}${footer}`,
+      `${header}${fallbackNotes({ main: mainCommits, deps }, migrations)}${footer}`,
     );
     return;
   }
@@ -510,7 +655,7 @@ const main = async () => {
       `prompt too large (${prompt.length} chars > ${MAX_PROMPT_CHARS}); emitting fallback notes`,
     );
     process.stdout.write(
-      `${header}${fallbackNotes(commits, migrations)}${footer}`,
+      `${header}${fallbackNotes({ main: mainCommits, deps }, migrations)}${footer}`,
     );
     return;
   }
@@ -524,31 +669,14 @@ const main = async () => {
     { role: "user", content: prompt },
   ];
 
-  const tryCall = async (payload) => {
-    try {
-      return await callModel(payload);
-    } catch (err) {
-      if (/temperature/i.test(err.message) && "temperature" in payload) {
-        log("model rejected temperature parameter; retrying without it");
-        const { temperature, ...rest } = payload;
-        return callModel(rest);
-      }
-      throw err;
-    }
-  };
-
   try {
-    const notes = await tryCall({
-      model: RELEASE_NOTES_MODEL,
-      messages,
-      temperature: 0.1,
-    });
+    const notes = await generateNotes(messages);
     if (!notes) throw new Error("empty model output");
     process.stdout.write(`${header}${notes}${footer}\n`);
   } catch (err) {
     log(`model call failed: ${err.message}; emitting fallback notes`);
     process.stdout.write(
-      `${header}${fallbackNotes(commits, migrations)}${footer}`,
+      `${header}${fallbackNotes({ main: mainCommits, deps }, migrations)}${footer}`,
     );
   }
 };

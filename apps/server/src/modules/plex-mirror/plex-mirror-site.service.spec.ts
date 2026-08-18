@@ -9,6 +9,15 @@ import {
 } from './plex-mirror-site.service';
 
 jest.mock('axios');
+// httpRetry.ts builds a shared retrying axios instance at module load
+// (rateLimitAwareHttp) via the real axios-retry - which reads
+// instance.interceptors and crashes once axios.create() is auto-mocked to
+// return undefined. Neutralize it the same way plexApi.spec.ts does.
+jest.mock('axios-retry', () => ({
+  __esModule: true,
+  default: jest.fn(),
+  exponentialDelay: jest.fn(),
+}));
 
 describe('parsePlexUrl', () => {
   it('defaults to port 80 for http with no explicit port', () => {
