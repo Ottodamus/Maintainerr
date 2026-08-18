@@ -42,6 +42,7 @@ describe('RulesService.resetCacheIfGroupUsesRuleThatRequiresIt', () => {
       logger as any,
       {} as any,
       { getUsernames: jest.fn().mockResolvedValue([]) } as any,
+      { getAll: jest.fn().mockResolvedValue([]) } as any,
     );
 
   const stubGetRuleConstants = (service: RulesService) => {

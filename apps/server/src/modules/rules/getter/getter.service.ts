@@ -13,6 +13,7 @@ import { ArrLookupCache } from '../helpers/arr-lookup-cache';
 import { EmbyGetterService } from './emby-getter.service';
 import { JellyfinGetterService } from './jellyfin-getter.service';
 import { PlexGetterService } from './plex-getter.service';
+import { PlexMirrorGetterService } from './plex-mirror-getter.service';
 import { RadarrGetterService } from './radarr-getter.service';
 import { SeerrGetterService } from './seerr-getter.service';
 import { SonarrGetterService } from './sonarr-getter.service';
@@ -34,6 +35,7 @@ export class ValueGetterService {
     private readonly tracearrGetter: TracearrGetterService,
     private readonly jellyfinGetter: JellyfinGetterService,
     private readonly embyGetter: EmbyGetterService,
+    private readonly plexMirrorGetter: PlexMirrorGetterService,
     private readonly mediaServerFactory: MediaServerFactory,
   ) {}
 
@@ -135,6 +137,9 @@ export class ValueGetterService {
           ruleGroup,
           currentRule,
         );
+      }
+      case Application.PLEX_MIRROR: {
+        return await this.plexMirrorGetter.get(val2, libItem, arrLookupCache);
       }
       default: {
         return null;

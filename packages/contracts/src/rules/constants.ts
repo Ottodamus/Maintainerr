@@ -72,6 +72,7 @@ export enum Application {
   EMBY = 7,
   STREAMYSTATS = 8,
   TRACEARR = 9,
+  PLEX_MIRROR = 10,
 }
 
 /**
@@ -88,6 +89,7 @@ export const ApplicationNames: Record<Application, string> = {
   [Application.EMBY]: 'Emby',
   [Application.STREAMYSTATS]: 'Streamystats',
   [Application.TRACEARR]: 'Tracearr',
+  [Application.PLEX_MIRROR]: 'Plex Mirror Sites',
 }
 
 /**

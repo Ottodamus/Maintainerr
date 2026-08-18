@@ -62,6 +62,7 @@ describe('RulesService Test Media Tracearr freshness', () => {
       createMockLogger() as never,
       tracearrApi,
       { getUsernames: jest.fn().mockResolvedValue([]) } as any,
+      { getAll: jest.fn().mockResolvedValue([]) } as any, // plexMirrorSiteService
     );
 
     return { service, tracearrApi, comparator };

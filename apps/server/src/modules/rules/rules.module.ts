@@ -12,6 +12,7 @@ import { CollectionsModule } from '../collections/collections.module';
 import { Collection } from '../collections/entities/collection.entities';
 import { CollectionMedia } from '../collections/entities/collection_media.entities';
 import { MetadataModule } from '../metadata/metadata.module';
+import { PlexMirrorModule } from '../plex-mirror/plex-mirror.module';
 import { RadarrSettings } from '../settings/entities/radarr_settings.entities';
 import { Settings } from '../settings/entities/settings.entities';
 import { SonarrSettings } from '../settings/entities/sonarr_settings.entities';
@@ -28,6 +29,7 @@ import { JellyfinGetterService } from './getter/jellyfin-getter.service';
 import { MetadataRuleValueService } from './getter/metadata-rule-value.service';
 import { SeerrGetterService } from './getter/seerr-getter.service';
 import { PlexGetterService } from './getter/plex-getter.service';
+import { PlexMirrorGetterService } from './getter/plex-mirror-getter.service';
 import { RadarrGetterService } from './getter/radarr-getter.service';
 import { SonarrGetterService } from './getter/sonarr-getter.service';
 import { SportarrGetterService } from './getter/sportarr-getter.service';
@@ -74,6 +76,7 @@ import { RuleMaintenanceService } from './tasks/rule-maintenance.service';
     ActionsModule,
     forwardRef(() => CollectionsModule),
     TasksModule,
+    PlexMirrorModule,
   ],
   providers: [
     RulesService,
@@ -84,6 +87,7 @@ import { RuleMaintenanceService } from './tasks/rule-maintenance.service';
     RuleExecutorJobManagerService,
     ExclusionTypeCorrectorService,
     PlexGetterService,
+    PlexMirrorGetterService,
     JellyfinGetterService,
     EmbyGetterService,
     MetadataRuleValueService,

@@ -70,6 +70,7 @@ describe('RulesService exclusions - global (null ruleGroupId) handling', () => {
       logger as any,
       {} as any, // tracearrApi,
       { getUsernames: jest.fn().mockResolvedValue([]) } as any,
+      { getAll: jest.fn().mockResolvedValue([]) } as any, // plexMirrorSiteService
     );
 
     return {

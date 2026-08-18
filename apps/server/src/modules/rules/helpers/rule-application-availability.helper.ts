@@ -15,6 +15,7 @@ const MEDIA_SERVER_BY_APPLICATION: Partial<
 > = {
   [Application.TAUTULLI]: MediaServerType.PLEX,
   [Application.STREAMYSTATS]: MediaServerType.JELLYFIN,
+  [Application.PLEX_MIRROR]: MediaServerType.PLEX,
 };
 
 /**
@@ -24,16 +25,25 @@ const MEDIA_SERVER_BY_APPLICATION: Partial<
  *
  * Settings only, never reachability - an unreachable integration is transient
  * and the getters already handle it.
+ *
+ * `hasMirrorSites` is separate from `settings` since PlexMirrorSite rows live
+ * in their own table, not the settings singleton - defaults to false (hidden)
+ * so a caller that forgets to pass it fails closed, not open.
  */
 export const unavailableRuleApplications = (
   settings: Settings | null | undefined,
   servarr: ServarrAvailability,
+  hasMirrorSites: boolean = false,
 ): Application[] => {
   if (!settings) {
     return [];
   }
 
   const unavailable = new Set<Application>();
+
+  if (!hasMirrorSites) {
+    unavailable.add(Application.PLEX_MIRROR);
+  }
 
   if (!settings.seerr_api_key || !settings.seerr_url) {
     unavailable.add(Application.SEERR);

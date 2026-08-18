@@ -1783,6 +1783,33 @@ export class RuleConstants {
         },
       ],
     },
+    {
+      // Combines this server's own viewCount/lastViewedAt with each
+      // configured mirror site's native watch data (each site tracks its own
+      // local plays independently - see plex-mirror-getter.service.ts).
+      // Movie/show level only, matching PlexMirrorSyncService's own scope:
+      // a season/episode match would need a second resolution step within
+      // the matched show on each site.
+      id: Application.PLEX_MIRROR,
+      name: 'Plex Mirror Sites',
+      mediaType: MediaType.BOTH,
+      props: [
+        {
+          id: 0,
+          name: 'combinedViewCount',
+          humanName: 'Times viewed (this server + all mirror sites)',
+          mediaType: MediaType.BOTH,
+          type: RuleType.NUMBER,
+        },
+        {
+          id: 1,
+          name: 'combinedLastViewedAt',
+          humanName: 'Last view date (this server + all mirror sites)',
+          mediaType: MediaType.BOTH,
+          type: RuleType.DATE,
+        },
+      ],
+    },
   ];
 
   constructor() {

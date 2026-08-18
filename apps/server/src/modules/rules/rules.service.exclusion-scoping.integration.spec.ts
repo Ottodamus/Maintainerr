@@ -65,6 +65,7 @@ describe('Exclusion scoping (real DB) - excluded-in-A item is added in B', () =>
       createMockLogger() as any,
       {} as any, // tracearrApi,
       { getUsernames: jest.fn().mockResolvedValue([]) } as any,
+      { getAll: jest.fn().mockResolvedValue([]) } as any, // plexMirrorSiteService
     );
 
   beforeAll(async () => {

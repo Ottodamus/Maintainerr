@@ -33,6 +33,7 @@ describe('RulesService.updateRules', () => {
       eventEmitter: unknown;
       servarrTagService: unknown;
       ruleUsersService: unknown;
+      plexMirrorSiteService: unknown;
     }> = {},
   ) =>
     new RulesService(
@@ -57,6 +58,9 @@ describe('RulesService.updateRules', () => {
       {} as any,
       (overrides.ruleUsersService ?? {
         getUsernames: jest.fn().mockResolvedValue([]),
+      }) as any,
+      (overrides.plexMirrorSiteService ?? {
+        getAll: jest.fn().mockResolvedValue([]),
       }) as any,
     );
 

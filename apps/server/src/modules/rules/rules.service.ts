@@ -36,6 +36,7 @@ import {
 } from '../collections/interfaces/collection-media.interface';
 import { MaintainerrLogger } from '../logging/logs.service';
 import { Notification } from '../notifications/entities/notification.entities';
+import { PlexMirrorSiteService } from '../plex-mirror/plex-mirror-site.service';
 import { RadarrSettings } from '../settings/entities/radarr_settings.entities';
 import { Settings } from '../settings/entities/settings.entities';
 import { SonarrSettings } from '../settings/entities/sonarr_settings.entities';
@@ -109,6 +110,7 @@ export class RulesService {
     private readonly logger: MaintainerrLogger,
     private readonly tracearrApi: TracearrApiService,
     private readonly ruleUsersService: RuleUsersService,
+    private readonly plexMirrorSiteService: PlexMirrorSiteService,
   ) {
     logger.setContext(RulesService.name);
     this.ruleConstants = new RuleConstants();
@@ -146,12 +148,17 @@ export class RulesService {
    */
   async getUnavailableApplications(): Promise<Application[]> {
     const settings = await this.settingsRepo.findOne({ where: {} });
+    const mirrorSites = await this.plexMirrorSiteService.getAll();
 
-    return unavailableRuleApplications(settings, {
-      radarr: await this.radarrSettingsRepo.exists(),
-      sonarr: await this.sonarrSettingsRepo.exists(),
-      sportarr: await this.sportarrSettingsRepo.exists(),
-    });
+    return unavailableRuleApplications(
+      settings,
+      {
+        radarr: await this.radarrSettingsRepo.exists(),
+        sonarr: await this.sonarrSettingsRepo.exists(),
+        sportarr: await this.sportarrSettingsRepo.exists(),
+      },
+      mirrorSites.length > 0,
+    );
   }
   async getRules(ruleGroupId: number): Promise<Rules[]> {
     try {

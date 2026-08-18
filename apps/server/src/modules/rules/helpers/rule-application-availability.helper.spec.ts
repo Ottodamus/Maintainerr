@@ -19,8 +19,10 @@ const servarr = { radarr: true, sonarr: true, sportarr: true };
 
 describe('unavailableRuleApplications', () => {
   it('reports only the wrong-server companion when everything is set up', () => {
-    // Streamystats is configured but this is a Plex server.
+    // Streamystats is configured but this is a Plex server. Plex Mirror
+    // Sites is unavailable too since hasMirrorSites defaults to false here.
     expect(unavailableRuleApplications(allConfigured, servarr)).toEqual([
+      Application.PLEX_MIRROR,
       Application.STREAMYSTATS,
     ]);
   });
@@ -90,5 +92,38 @@ describe('unavailableRuleApplications', () => {
   // would fail every rule group before the user can configure anything.
   it('reports nothing when there are no settings at all', () => {
     expect(unavailableRuleApplications(null, servarr)).toEqual([]);
+  });
+
+  describe('Plex Mirror Sites', () => {
+    it('is unavailable by default (hasMirrorSites omitted)', () => {
+      expect(unavailableRuleApplications(allConfigured, servarr)).toContain(
+        Application.PLEX_MIRROR,
+      );
+    });
+
+    it('is unavailable when explicitly false, even on Plex', () => {
+      const result = unavailableRuleApplications(allConfigured, servarr, false);
+
+      expect(result).toContain(Application.PLEX_MIRROR);
+    });
+
+    it('is available when mirror sites exist and the server is Plex', () => {
+      const result = unavailableRuleApplications(allConfigured, servarr, true);
+
+      expect(result).not.toContain(Application.PLEX_MIRROR);
+    });
+
+    it('stays unavailable on a non-Plex server even with mirror sites configured', () => {
+      const result = unavailableRuleApplications(
+        {
+          ...allConfigured,
+          media_server_type: MediaServerType.JELLYFIN,
+        } as Settings,
+        servarr,
+        true,
+      );
+
+      expect(result).toContain(Application.PLEX_MIRROR);
+    });
   });
 });

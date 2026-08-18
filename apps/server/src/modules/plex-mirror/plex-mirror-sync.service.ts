@@ -4,47 +4,15 @@ import { Repository } from 'typeorm';
 import { Collection } from '../collections/entities/collection.entities';
 import { CollectionMedia } from '../collections/entities/collection_media.entities';
 import { MaintainerrLogger } from '../logging/logs.service';
-import { PlexLibraryItem } from '../api/plex-api/interfaces/library.interfaces';
 import { PlexMapper } from '../api/media-server/plex/plex.mapper';
 import { PlexMirrorCollectionLink } from './entities/plex-mirror-collection-link.entities';
 import { PlexMirrorSite } from './entities/plex-mirror-site.entities';
 import { createPlexMirrorClient, PlexMirrorClient } from './plex-mirror-client';
-
-interface ProviderIdIndex {
-  tmdb: Map<number, string>;
-  tvdb: Map<number, string>;
-}
-
-const buildProviderIdIndex = (items: PlexLibraryItem[]): ProviderIdIndex => {
-  const index: ProviderIdIndex = { tmdb: new Map(), tvdb: new Map() };
-
-  for (const item of items) {
-    const providerIds = PlexMapper.extractProviderIds(item.Guid, item.guid);
-
-    for (const id of providerIds.tmdb ?? []) {
-      const numericId = Number(id);
-      if (!Number.isNaN(numericId)) {
-        index.tmdb.set(numericId, item.ratingKey);
-      }
-    }
-
-    for (const id of providerIds.tvdb ?? []) {
-      const numericId = Number(id);
-      if (!Number.isNaN(numericId)) {
-        index.tvdb.set(numericId, item.ratingKey);
-      }
-    }
-  }
-
-  return index;
-};
-
-const resolveRatingKey = (
-  media: Pick<CollectionMedia, 'tmdbId' | 'tvdbId'>,
-  index: ProviderIdIndex,
-): string | undefined =>
-  (media.tmdbId != null ? index.tmdb.get(media.tmdbId) : undefined) ??
-  (media.tvdbId != null ? index.tvdb.get(media.tvdbId) : undefined);
+import {
+  buildProviderIdIndex,
+  ProviderIdIndex,
+  resolveByProviderIds,
+} from './plex-mirror-matching.util';
 
 /**
  * Pushes each visible, movie/show-level Collection's current membership onto
@@ -88,7 +56,7 @@ export class PlexMirrorSyncService {
     }
 
     const libraryItems = await client.getLibraryItems(site.librarySectionId);
-    const index = buildProviderIdIndex(libraryItems);
+    const index = buildProviderIdIndex(libraryItems, (item) => item.ratingKey);
 
     const collections = await this.collectionRepo.find({
       where: [{ visibleOnHome: true }, { visibleOnRecommended: true }],
@@ -115,14 +83,14 @@ export class PlexMirrorSyncService {
     machineId: string,
     site: PlexMirrorSite,
     collection: Collection,
-    index: ProviderIdIndex,
+    index: ProviderIdIndex<string>,
   ): Promise<void> {
     const media = await this.collectionMediaRepo.find({
       where: { collectionId: collection.id },
     });
 
     const matchedRatingKeys = media
-      .map((item) => resolveRatingKey(item, index))
+      .map((item) => resolveByProviderIds(item, index))
       .filter((ratingKey): ratingKey is string => ratingKey != null);
 
     const existingLink = await this.linkRepo.findOne({

@@ -25,11 +25,14 @@ describe('RulesService.getRuleConstants', () => {
     tracearr_server_id: '11111111-1111-4111-8111-111111111111',
   };
 
-  const createRulesService = (exists: {
-    radarr: boolean;
-    sonarr: boolean;
-    sportarr: boolean;
-  }) =>
+  const createRulesService = (
+    exists: {
+      radarr: boolean;
+      sonarr: boolean;
+      sportarr: boolean;
+    },
+    mirrorSites: unknown[] = [],
+  ) =>
     new RulesService(
       {} as any, // rulesRepository
       {} as any, // ruleGroupRepository
@@ -51,6 +54,7 @@ describe('RulesService.getRuleConstants', () => {
       logger as any,
       {} as any, // tracearrApi,
       { getUsernames: jest.fn().mockResolvedValue([]) } as any,
+      { getAll: jest.fn().mockResolvedValue(mirrorSites) } as any,
     );
 
   const applicationIds = async (service: RulesService) =>
@@ -90,6 +94,28 @@ describe('RulesService.getRuleConstants', () => {
 
     await expect(applicationIds(service)).resolves.toContain(
       Application.TRACEARR,
+    );
+  });
+
+  it('omits Plex Mirror Sites when no mirror site is configured', async () => {
+    const service = createRulesService(
+      { radarr: false, sonarr: false, sportarr: false },
+      [],
+    );
+
+    await expect(applicationIds(service)).resolves.not.toContain(
+      Application.PLEX_MIRROR,
+    );
+  });
+
+  it('includes Plex Mirror Sites when at least one mirror site exists', async () => {
+    const service = createRulesService(
+      { radarr: false, sonarr: false, sportarr: false },
+      [{ id: 1, siteName: 'Site A' }],
+    );
+
+    await expect(applicationIds(service)).resolves.toContain(
+      Application.PLEX_MIRROR,
     );
   });
 });
