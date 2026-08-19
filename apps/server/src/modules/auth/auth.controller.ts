@@ -6,6 +6,7 @@ import {
 import {
   Body,
   Controller,
+  Get,
   HttpCode,
   Post,
   Res,
@@ -14,7 +15,9 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { Response } from 'express';
 import { ZodValidationPipe } from 'nestjs-zod';
+import { Public } from '../../common/decorators/public.decorator';
 import { MaintainerrLogger } from '../logging/logs.service';
+import { SettingsDataService } from '../settings/settings-data.service';
 import { UsersService } from '../users/users.service';
 import {
   isSecureCookieEnabled,
@@ -30,11 +33,24 @@ export class AuthController {
     private readonly plexAuthService: PlexAuthService,
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
+    private readonly settingsDataService: SettingsDataService,
     private readonly logger: MaintainerrLogger,
   ) {
     this.logger.setContext(AuthController.name);
   }
 
+  /**
+   * The Plex OAuth popup needs this device identifier before any session
+   * exists, so it can't come from the (now auth-gated) full settings
+   * payload - this is the one non-secret field it actually needs.
+   */
+  @Public()
+  @Get('/client-id')
+  getClientId() {
+    return { clientId: this.settingsDataService.clientId };
+  }
+
+  @Public()
   @Post('/plex/callback')
   @HttpCode(200)
   async plexCallback(
@@ -65,6 +81,7 @@ export class AuthController {
     return user;
   }
 
+  @Public()
   @Post('/logout')
   @HttpCode(200)
   logout(@Res({ passthrough: true }) response: Response) {

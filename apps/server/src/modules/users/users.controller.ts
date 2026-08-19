@@ -18,13 +18,14 @@ import {
 import { ZodValidationPipe } from 'nestjs-zod';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { AuthenticatedUser } from '../../common/types/authenticated-user.interface';
 import { UsersService } from './users.service';
 
+// JwtAuthGuard already runs globally (APP_GUARD in AppModule) - only the
+// role restriction needs to be declared here.
 @Controller('api/users')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(RolesGuard)
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 

@@ -1,7 +1,11 @@
 import { HealthResponse, LivenessResponse } from '@maintainerr/contracts';
 import { Controller, Get, HttpException, HttpStatus } from '@nestjs/common';
+import { Public } from '../common/decorators/public.decorator';
 import { HealthService } from './health.service';
 
+// Docker's HEALTHCHECK and any external uptime monitor hit these
+// unauthenticated - they must stay reachable regardless of session state.
+@Public()
 @Controller('/api/health')
 export class HealthController {
   constructor(private readonly healthService: HealthService) {}

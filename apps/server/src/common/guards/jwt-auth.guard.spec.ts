@@ -1,5 +1,6 @@
 import { UserRole } from '@maintainerr/contracts';
 import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import { SESSION_COOKIE_NAME } from '../../modules/auth/auth.constants';
 import { MaintainerrLogger } from '../../modules/logging/logs.service';
@@ -13,6 +14,8 @@ function buildContext(request: {
     switchToHttp: () => ({
       getRequest: () => request,
     }),
+    getHandler: () => undefined,
+    getClass: () => undefined,
   } as unknown as ExecutionContext;
 }
 
@@ -26,11 +29,24 @@ describe('JwtAuthGuard', () => {
     debug: jest.fn(),
   } as unknown as jest.Mocked<MaintainerrLogger>;
 
+  const reflector = {
+    getAllAndOverride: jest.fn(),
+  } as unknown as jest.Mocked<Reflector>;
+
   let guard: JwtAuthGuard;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    guard = new JwtAuthGuard(jwtService, logger);
+    reflector.getAllAndOverride.mockReturnValue(false);
+    guard = new JwtAuthGuard(jwtService, logger, reflector);
+  });
+
+  it('allows access without a session when the route is @Public()', async () => {
+    reflector.getAllAndOverride.mockReturnValue(true);
+    const context = buildContext({ cookies: {} });
+
+    await expect(guard.canActivate(context)).resolves.toBe(true);
+    expect(jwtService.verifyAsync).not.toHaveBeenCalled();
   });
 
   it('throws UnauthorizedException when no session cookie is present', async () => {

@@ -1,14 +1,13 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify'
-import { useLoginWithPlex } from '../api/auth'
-import { useSettings } from '../api/settings'
+import { useClientId, useLoginWithPlex } from '../api/auth'
 import LoadingSpinner from '../components/Common/LoadingSpinner'
 import PlexLoginButton from '../components/Login/Plex'
 
 const LoginPage = () => {
   const navigate = useNavigate()
-  const { data: settings, isLoading: isSettingsLoading } = useSettings()
+  const { data: clientId, isLoading: isClientIdLoading } = useClientId()
   const loginMutation = useLoginWithPlex()
   const [error, setError] = useState<string | null>(null)
 
@@ -25,11 +24,11 @@ const LoginPage = () => {
       <title>Sign In - Maintainerr</title>
       <div className="flex min-h-screen flex-col items-center justify-center gap-6 px-4">
         <h1 className="text-2xl font-bold text-zinc-100">Maintainerr</h1>
-        {isSettingsLoading ? (
+        {isClientIdLoading ? (
           <LoadingSpinner />
         ) : (
           <PlexLoginButton
-            clientIdentifier={settings?.clientId ?? ''}
+            clientIdentifier={clientId ?? ''}
             isProcessing={loginMutation.isPending}
             onAuthToken={handleAuthToken}
             onError={(message) => {

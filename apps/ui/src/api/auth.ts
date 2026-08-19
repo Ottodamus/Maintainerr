@@ -33,6 +33,30 @@ export const useCurrentUser = (options?: UseCurrentUserOptions) => {
 
 export type UseCurrentUserResult = ReturnType<typeof useCurrentUser>
 
+type UseClientIdOptions = Omit<
+  UseQueryOptions<string, Error>,
+  'queryKey' | 'queryFn'
+>
+
+// The login popup needs this device identifier before any session exists,
+// so it comes from its own public endpoint rather than the (auth-gated)
+// full settings payload.
+export const useClientId = (options?: UseClientIdOptions) => {
+  return useQuery<string, Error>({
+    queryKey: ['auth', 'clientId'],
+    queryFn: async () => {
+      const { clientId } = await GetApiHandler<{ clientId: string }>(
+        '/auth/client-id',
+      )
+      return clientId
+    },
+    staleTime: Infinity,
+    ...options,
+  })
+}
+
+export type UseClientIdResult = ReturnType<typeof useClientId>
+
 type UseLoginWithPlexOptions = Omit<
   UseMutationOptions<UserDto, Error, string>,
   'mutationFn' | 'mutationKey'
