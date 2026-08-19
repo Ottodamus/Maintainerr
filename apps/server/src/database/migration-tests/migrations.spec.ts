@@ -224,45 +224,42 @@ describe('database migrations', () => {
         notnull: 1,
       });
       expect(mirrorLink.mirrorRatingKey).toMatchObject(nullableVarchar);
+
+      // AddUserPasswordHash: the break-glass account's password hash - only
+      // ever set on that one row, null for every Plex-invited user.
+      expect(user.passwordHash).toMatchObject(nullableVarchar);
     } finally {
       await ds.destroy();
     }
   });
 
-  it('creates the plex_mirror_collection_link table with its unique index (generated, not hand-waived)', () => {
+  it('rebuilds the user table with passwordHash via SQLite temp-table dance (generated, not hand-waived)', () => {
     const newest = all[all.length - 1];
     const src = fs.readFileSync(path.join(MIGRATIONS_DIR, newest.file), 'utf8');
-    // Another brand new, standalone table - the generated signal is the exact
-    // column list plus the unique (plexMirrorSiteId, collectionId) index
-    // TypeORM derives from the entity's @Index decorator.
-    expect(src).toContain('CREATE TABLE "plex_mirror_collection_link"');
-    expect(src).toContain('"plexMirrorSiteId" integer NOT NULL');
-    expect(src).toContain('"collectionId" integer NOT NULL');
-    expect(src).toContain('"mirrorRatingKey" varchar');
-    expect(src).toContain(
-      'ON "plex_mirror_collection_link" ("plexMirrorSiteId", "collectionId")',
-    );
+    // SQLite can't ALTER TABLE ADD COLUMN while preserving the existing
+    // unique indexes in one step, so TypeORM rebuilds the table instead -
+    // that rebuild (not a plain ALTER TABLE) is the generated signal a
+    // hand-written migration wouldn't reproduce.
+    expect(src).toContain('CREATE TABLE "temporary_user"');
+    expect(src).toContain('"passwordHash" varchar');
+    expect(src).toContain('RENAME TO "user"');
   });
 
   // We don't revert the whole chain: several pre-existing migrations have
   // non-reversible down() paths (production only ever migrates up). We do confirm
   // the newest migration's down() is symmetric - the regression this catches when
   // a migration is added.
-  it('revert the newest migration cleanly (symmetric down)', async () => {
+  it('reverts the newest migration cleanly (symmetric down)', async () => {
     const ds = await makeDS(all.map((m) => m.cls)).initialize();
     try {
       await ds.runMigrations();
-      const has = async () =>
-        (
-          await ds.query(
-            `SELECT name FROM sqlite_master WHERE type='table' AND name='plex_mirror_collection_link'`,
-          )
-        ).length > 0;
-      expect(await has()).toBe(true);
+      const hasPasswordHash = async () =>
+        (await columns(ds, 'user')).some((c) => c.name === 'passwordHash');
+      expect(await hasPasswordHash()).toBe(true);
 
       await ds.undoLastMigration();
 
-      expect(await has()).toBe(false);
+      expect(await hasPasswordHash()).toBe(false);
       const [{ c }] = await ds.query(`SELECT COUNT(*) AS c FROM migrations`);
       expect(Number(c)).toBe(all.length - 1);
     } finally {

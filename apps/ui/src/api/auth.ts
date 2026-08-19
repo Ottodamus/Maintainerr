@@ -84,6 +84,33 @@ export const useLoginWithPlex = (options?: UseLoginWithPlexOptions) => {
 
 export type UseLoginWithPlexResult = ReturnType<typeof useLoginWithPlex>
 
+type UseLoginWithPasswordOptions = Omit<
+  UseMutationOptions<UserDto, Error, { username: string; password: string }>,
+  'mutationFn' | 'mutationKey'
+>
+
+// The break-glass account: a fallback for when Plex OAuth itself is
+// unreachable, not a general auth method.
+export const useLoginWithPassword = (options?: UseLoginWithPasswordOptions) => {
+  const queryClient = useQueryClient()
+
+  return useMutation<UserDto, Error, { username: string; password: string }>({
+    mutationKey: ['auth', 'localLogin'],
+    mutationFn: async (credentials) => {
+      return await PostApiHandler<UserDto>('/auth/local/login', credentials)
+    },
+    onSuccess: (user) => {
+      queryClient.setQueryData(
+        ['auth', 'me'] satisfies CurrentUserQueryKey,
+        user,
+      )
+    },
+    ...options,
+  })
+}
+
+export type UseLoginWithPasswordResult = ReturnType<typeof useLoginWithPassword>
+
 type UseLogoutOptions = Omit<
   UseMutationOptions<{ success: boolean }, Error, void>,
   'mutationFn' | 'mutationKey'

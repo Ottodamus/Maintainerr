@@ -36,4 +36,13 @@ export class User {
 
   @Column({ type: 'datetime', default: () => 'CURRENT_TIMESTAMP' })
   createdAt: Date;
+
+  // Only ever set on the single break-glass admin account, upserted from
+  // BREAK_GLASS_USERNAME/BREAK_GLASS_PASSWORD at startup - never set for a
+  // Plex-invited user. Its presence is what excludes a row from the
+  // Plex-claim path (claimOrCreateOnLogin) and from the first-login
+  // bootstrap count, so a Plex account can never take over this row by
+  // username collision.
+  @Column({ nullable: true })
+  passwordHash: string | null;
 }

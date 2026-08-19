@@ -5,6 +5,8 @@ import { AuthSecretModule } from './auth-secret.module';
 import { AuthSecretService } from './auth-secret.service';
 import { AuthController } from './auth.controller';
 import { SESSION_JWT_EXPIRES_IN } from './auth.constants';
+import { BreakGlassService } from './break-glass.service';
+import { LocalLoginRateLimiter } from './local-login-rate-limiter';
 import { PlexAuthService } from './plex-auth.service';
 
 /**
@@ -25,7 +27,7 @@ import { PlexAuthService } from './plex-auth.service';
       inject: [AuthSecretService],
     }),
   ],
-  providers: [PlexAuthService],
+  providers: [PlexAuthService, BreakGlassService, LocalLoginRateLimiter],
   controllers: [AuthController],
   exports: [JwtModule],
 })

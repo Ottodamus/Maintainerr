@@ -1,8 +1,9 @@
 import { InviteUserDto, UpdateUserDto, UserRole } from '@maintainerr/contracts';
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
+import { IsNull, Not, Repository } from 'typeorm';
 import { PlexAccount } from '../auth/plex-auth.service';
+import { verifyPassword } from '../auth/password-hash.util';
 import { MaintainerrLogger } from '../logging/logs.service';
 import { User } from './entities/user.entities';
 
@@ -24,8 +25,10 @@ export class UsersService {
     return this.userRepo.findOneBy({ id });
   }
 
+  // Excludes the break-glass account: it isn't a person who needs an invite,
+  // so it must never consume the "first login becomes ADMIN" bootstrap slot.
   public count(): Promise<number> {
-    return this.userRepo.count();
+    return this.userRepo.count({ where: { passwordHash: IsNull() } });
   }
 
   public invite(dto: InviteUserDto): Promise<User> {
@@ -82,6 +85,9 @@ export class UsersService {
       plexId: IsNull(),
       plexUsername: usernameLower,
       allowed: true,
+      // A break-glass row must never be claimable via Plex, even if its
+      // reserved username happens to collide with a real Plex username.
+      passwordHash: IsNull(),
     });
     if (invited) {
       await this.userRepo.update(
@@ -114,5 +120,73 @@ export class UsersService {
     throw new ForbiddenException(
       'This Plex account is not allowed to access Maintainerr. Ask an admin to invite you.',
     );
+  }
+
+  /**
+   * Upserts the single break-glass admin account from
+   * BREAK_GLASS_USERNAME/BREAK_GLASS_PASSWORD on every boot, so rotating the
+   * password is just changing the env var and redeploying. Refuses to touch
+   * a row that's already claimed by a real Plex account (plexId set) -
+   * rather than silently grafting a password onto someone else's account
+   * because their Plex username happened to collide with the chosen
+   * break-glass username.
+   */
+  public async upsertBreakGlassAdmin(
+    username: string,
+    passwordHash: string,
+  ): Promise<void> {
+    const usernameLower = username.toLowerCase();
+    const existing = await this.userRepo.findOneBy({
+      plexUsername: usernameLower,
+    });
+
+    if (existing) {
+      if (existing.plexId !== null) {
+        this.logger.warn(
+          `BREAK_GLASS_USERNAME "${usernameLower}" collides with an existing Plex-linked account - refusing to attach a password to it. Choose a different break-glass username.`,
+        );
+        return;
+      }
+
+      await this.userRepo.update(
+        { id: existing.id },
+        { passwordHash, role: UserRole.ADMIN, allowed: true },
+      );
+      return;
+    }
+
+    const breakGlassAdmin = this.userRepo.create({
+      plexId: null,
+      plexUsername: usernameLower,
+      email: null,
+      thumb: null,
+      role: UserRole.ADMIN,
+      allowed: true,
+      lastLoginAt: null,
+      passwordHash,
+    });
+    await this.userRepo.save(breakGlassAdmin);
+  }
+
+  /**
+   * Verifies the break-glass account's username/password. Only ever matches
+   * a row that has a passwordHash - a Plex-invited user can never log in
+   * this way, even if they somehow knew a password.
+   */
+  public async verifyLocalLogin(
+    username: string,
+    password: string,
+  ): Promise<User | null> {
+    const user = await this.userRepo.findOneBy({
+      plexUsername: username.toLowerCase(),
+      passwordHash: Not(IsNull()),
+    });
+
+    if (!user?.passwordHash || !verifyPassword(password, user.passwordHash)) {
+      return null;
+    }
+
+    await this.userRepo.update({ id: user.id }, { lastLoginAt: new Date() });
+    return (await this.findById(user.id))!;
   }
 }

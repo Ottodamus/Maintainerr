@@ -20,6 +20,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { AuthenticatedUser } from '../../common/types/authenticated-user.interface';
+import { toUserDto } from './user.mapper';
 import { UsersService } from './users.service';
 
 // JwtAuthGuard already runs globally (APP_GUARD in AppModule) - only the
@@ -31,13 +32,14 @@ export class UsersController {
 
   @Get('/me')
   async me(@CurrentUser() currentUser: AuthenticatedUser) {
-    return this.usersService.findById(currentUser.id);
+    const user = await this.usersService.findById(currentUser.id);
+    return user ? toUserDto(user) : null;
   }
 
   @Get()
   @Roles(UserRole.ADMIN)
   async findAll() {
-    return this.usersService.findAll();
+    return (await this.usersService.findAll()).map(toUserDto);
   }
 
   @Post()
@@ -45,7 +47,7 @@ export class UsersController {
   async invite(
     @Body(new ZodValidationPipe(inviteUserSchema)) payload: InviteUserDto,
   ) {
-    return this.usersService.invite(payload);
+    return toUserDto(await this.usersService.invite(payload));
   }
 
   @Patch('/:id')
@@ -54,6 +56,6 @@ export class UsersController {
     @Param('id', new ParseIntPipe()) id: number,
     @Body(new ZodValidationPipe(updateUserSchema)) payload: UpdateUserDto,
   ) {
-    return this.usersService.updateUser(id, payload);
+    return toUserDto(await this.usersService.updateUser(id, payload));
   }
 }
