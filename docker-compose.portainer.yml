@@ -1,0 +1,23 @@
+# Household deployment stack for this fork, built via Portainer's
+# "Repository" stack type (Stacks > Add stack > Repository) pointed at this
+# file - Portainer clones the repo itself and builds from the Dockerfile, so
+# there's no image to publish anywhere. Exposed on the LAN only; TLS and the
+# public hostname are handled by a Cloudflare Zero Trust published app in
+# front of this container's LAN IP:port, not by this file.
+services:
+  maintainerr:
+    build:
+      context: .
+    container_name: maintainerr
+    user: "1000:1000"
+    environment:
+      - TZ=Etc/UTC
+    volumes:
+      - /opt/docker/maintainerr/data:/opt/data
+    ports:
+      - 6246:6246
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', '/opt/app/healthcheck.sh']
+      interval: 30s
+      timeout: 5s
