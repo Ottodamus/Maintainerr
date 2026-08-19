@@ -1,9 +1,18 @@
+import { UserDto, UserRole } from '@maintainerr/contracts'
 import type { ReactNode } from 'react'
-import { render, screen } from '../../../test-utils/render'
-import { describe, expect, it, vi } from 'vitest'
+import { fireEvent, render, screen } from '../../../test-utils/render'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import SearchContext from '../../../contexts/search-context'
 import NavBar from './index'
+
+const logoutMutate = vi.fn()
+let currentUser: UserDto | undefined
+
+vi.mock('../../../api/auth', () => ({
+  useCurrentUser: () => ({ data: currentUser, isLoading: false }),
+  useLogout: () => ({ mutate: logoutMutate, isPending: false }),
+}))
 
 vi.mock('../../../router', () => ({
   prefetchRoute: vi.fn(),
@@ -45,6 +54,11 @@ const renderNavBar = () =>
   )
 
 describe('NavBar', () => {
+  beforeEach(() => {
+    logoutMutate.mockReset()
+    currentUser = undefined
+  })
+
   it('renders the overlays navigation entry unconditionally', () => {
     // The router-level MediaServerSetupGuard keeps unconfigured users out of
     // the nav entirely, so the overlay link shows for any configured server
@@ -52,5 +66,37 @@ describe('NavBar', () => {
     renderNavBar()
 
     expect(screen.getAllByText('Overlays')).toHaveLength(2)
+  })
+
+  it('offers a way to sign in when signed out', () => {
+    renderNavBar()
+
+    const signInLinks = screen.getAllByRole('link', { name: /sign in/i })
+    expect(signInLinks).toHaveLength(2)
+    signInLinks.forEach((link) => {
+      expect(link.getAttribute('href')).toBe('/login')
+    })
+  })
+
+  it('shows the current user and signs out on request', () => {
+    currentUser = {
+      id: 1,
+      plexId: '1',
+      plexUsername: 'ottodamus',
+      email: null,
+      thumb: null,
+      role: UserRole.ADMIN,
+      allowed: true,
+      lastLoginAt: null,
+      createdAt: new Date(),
+    }
+
+    renderNavBar()
+
+    expect(screen.getAllByText('ottodamus')).toHaveLength(2)
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Sign out' })[0])
+
+    expect(logoutMutate).toHaveBeenCalled()
   })
 })

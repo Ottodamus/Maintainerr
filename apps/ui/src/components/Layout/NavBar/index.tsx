@@ -7,17 +7,60 @@ import {
   CogIcon,
   CollectionIcon,
   EyeIcon,
+  LoginIcon,
+  LogoutIcon,
   PhotographIcon,
+  UserCircleIcon,
   XIcon,
 } from '@heroicons/react/outline'
 import { useLingui } from '@lingui/react/macro'
 import { ReactNode, use, useMemo, useRef } from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import { useCurrentUser, useLogout } from '../../../api/auth'
 import SearchContext from '../../../contexts/search-context'
 import { prefetchRoute } from '../../../router'
 import Messages from '../../Messages/Messages'
 import VersionStatus from '../../VersionStatus'
 import { useMediaServerSetupNavigationGuard } from '../MediaServerSetupGuard'
+
+const accountLinkClassName =
+  'flex items-center rounded-md px-2 py-2 text-sm font-medium text-zinc-300 transition duration-150 ease-in-out hover:bg-zinc-700 hover:text-white focus:bg-maintainerrdark-800 focus:outline-hidden'
+
+const AccountControl = () => {
+  const { data: currentUser, isLoading } = useCurrentUser()
+  const logout = useLogout()
+
+  if (isLoading) {
+    return null
+  }
+
+  if (!currentUser) {
+    return (
+      <Link to="/login" className={accountLinkClassName}>
+        <LoginIcon className="mr-3 h-5 w-5" />
+        Sign In
+      </Link>
+    )
+  }
+
+  return (
+    <div className="flex items-center justify-between rounded-md px-2 py-2 text-sm font-medium text-zinc-300">
+      <span className="flex min-w-0 items-center">
+        <UserCircleIcon className="mr-2 h-5 w-5 shrink-0" />
+        <span className="truncate">{currentUser.plexUsername}</span>
+      </span>
+      <button
+        type="button"
+        className="ml-2 shrink-0 text-zinc-400 transition duration-150 ease-in-out hover:text-white focus:outline-hidden"
+        aria-label="Sign out"
+        disabled={logout.isPending}
+        onClick={() => logout.mutate()}
+      >
+        <LogoutIcon className="h-5 w-5" />
+      </button>
+    </div>
+  )
+}
 
 interface NavBarLink {
   key: string
@@ -233,6 +276,7 @@ const NavBar: React.FC<NavBarProps> = ({ open, setClosed }) => {
                   </nav>
                 </div>
                 <span className="mb-4 flex flex-col gap-y-4">
+                  <AccountControl />
                   <Messages />
                   <VersionStatus />
                 </span>
@@ -281,6 +325,7 @@ const NavBar: React.FC<NavBarProps> = ({ open, setClosed }) => {
                 })}
               </nav>
               <div className="flex flex-col gap-y-4">
+                <AccountControl />
                 <Messages />
                 <VersionStatus />
               </div>
