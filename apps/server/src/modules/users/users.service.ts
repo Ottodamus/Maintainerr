@@ -60,8 +60,13 @@ export class UsersService {
   /**
    * Resolves a logged-in Plex account to a local User, claiming an
    * admin-created invite (matched by username) on first login and
-   * bootstrapping the very first person ever to log in as ADMIN. Throws
-   * ForbiddenException when the account is neither invited nor first.
+   * bootstrapping the very first person ever to log in as ADMIN. When the
+   * account is neither invited nor first, it self-registers a disabled
+   * access-request row (we now know their real Plex identity, so there's no
+   * need to make them type a username separately) and throws
+   * ForbiddenException either way - an existing-but-disabled row (whether
+   * still pending review or explicitly revoked by an admin) never gets a
+   * session, matching an admin-created invite's `allowed` gate.
    */
   public async claimOrCreateOnLogin(account: PlexAccount): Promise<User> {
     const plexId = account.id.toString();
@@ -69,6 +74,12 @@ export class UsersService {
 
     const existing = await this.userRepo.findOneBy({ plexId });
     if (existing) {
+      if (!existing.allowed) {
+        throw new ForbiddenException(
+          'This Plex account does not have access to Maintainerr yet. Ask an admin to approve it.',
+        );
+      }
+
       await this.userRepo.update(
         { id: existing.id },
         {
@@ -117,8 +128,20 @@ export class UsersService {
       return this.userRepo.save(admin);
     }
 
+    this.logger.log(`Recording an access request from "${usernameLower}".`);
+    const requested = this.userRepo.create({
+      plexId,
+      plexUsername: usernameLower,
+      email: account.email,
+      thumb: account.thumb,
+      role: UserRole.VIEWER,
+      allowed: false,
+      lastLoginAt: null,
+    });
+    await this.userRepo.save(requested);
+
     throw new ForbiddenException(
-      'This Plex account is not allowed to access Maintainerr. Ask an admin to invite you.',
+      'Access requested. An admin needs to approve you before you can sign in.',
     );
   }
 

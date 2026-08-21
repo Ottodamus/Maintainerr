@@ -34,6 +34,18 @@ const invitedApprover: UserDto = {
   createdAt: new Date('2026-01-02T00:00:00.000Z'),
 }
 
+const requestedAccess: UserDto = {
+  id: 3,
+  plexId: '333',
+  plexUsername: 'stranger',
+  email: null,
+  thumb: null,
+  role: UserRole.VIEWER,
+  allowed: false,
+  lastLoginAt: null,
+  createdAt: new Date('2026-01-03T00:00:00.000Z'),
+}
+
 vi.mock('../../../api/auth', () => ({
   useCurrentUser: () => ({ data: currentUser, isLoading: false }),
 }))
@@ -96,13 +108,17 @@ describe('UsersSettings', () => {
     expect(screen.getByText('Only admins can manage users.')).toBeTruthy()
   })
 
-  it('lists users and marks the current user and pending invites', () => {
+  it('lists users and marks the current user, pending invites, and unapproved access requests', () => {
+    users = [admin, invitedApprover, requestedAccess]
+
     render(<UsersSettings />)
 
     expect(screen.getByText('admin-user')).toBeTruthy()
     expect(screen.getByText('approver-user')).toBeTruthy()
+    expect(screen.getByText('stranger')).toBeTruthy()
     expect(screen.getByText('You')).toBeTruthy()
     expect(screen.getByText('Pending invite')).toBeTruthy()
+    expect(screen.getByText('No access')).toBeTruthy()
   })
 
   it("disables the current user's own role and access controls", () => {

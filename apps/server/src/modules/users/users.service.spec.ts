@@ -42,7 +42,7 @@ describe('UsersService', () => {
 
   describe('claimOrCreateOnLogin', () => {
     it('updates and returns an already-known user by plexId', async () => {
-      const existing = { id: 1, plexId: '555' } as User;
+      const existing = { id: 1, plexId: '555', allowed: true } as User;
       (userRepo.findOneBy as jest.Mock).mockResolvedValueOnce(existing);
       (userRepo.findOneBy as jest.Mock).mockResolvedValueOnce({
         ...existing,
@@ -56,6 +56,16 @@ describe('UsersService', () => {
         expect.objectContaining({ plexUsername: 'someuser' }),
       );
       expect(result.id).toBe(1);
+    });
+
+    it('rejects an already-known but disabled account without granting a session - whether still pending review or explicitly revoked', async () => {
+      const existing = { id: 1, plexId: '555', allowed: false } as User;
+      (userRepo.findOneBy as jest.Mock).mockResolvedValueOnce(existing);
+
+      await expect(service.claimOrCreateOnLogin(account)).rejects.toThrow(
+        ForbiddenException,
+      );
+      expect(userRepo.update).not.toHaveBeenCalled();
     });
 
     it('claims an admin-created invite matched by lowercased username', async () => {
@@ -92,9 +102,27 @@ describe('UsersService', () => {
       );
     });
 
-    it('rejects an uninvited account once at least one user already exists', async () => {
+    it('records an access request and rejects an uninvited account once at least one user already exists', async () => {
       (userRepo.findOneBy as jest.Mock).mockResolvedValue(null);
       (userRepo.count as jest.Mock).mockResolvedValue(1);
+      (userRepo.save as jest.Mock).mockImplementation((u) => u);
+
+      await expect(service.claimOrCreateOnLogin(account)).rejects.toThrow(
+        ForbiddenException,
+      );
+      expect(userRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          plexId: '555',
+          plexUsername: 'someuser',
+          role: UserRole.VIEWER,
+          allowed: false,
+        }),
+      );
+    });
+
+    it('does not create a second access-request row on a repeat attempt from the same still-disabled account', async () => {
+      const existing = { id: 3, plexId: '555', allowed: false } as User;
+      (userRepo.findOneBy as jest.Mock).mockResolvedValueOnce(existing);
 
       await expect(service.claimOrCreateOnLogin(account)).rejects.toThrow(
         ForbiddenException,

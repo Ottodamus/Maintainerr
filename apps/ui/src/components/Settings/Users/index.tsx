@@ -108,7 +108,9 @@ const UsersSettings = () => {
             <h3 className="heading">Users</h3>
             <p className="description">
               People allowed to sign in with Plex. Approvers can vote on pending
-              deletions; only admins can invite or manage other users.
+              deletions; only admins can invite or manage other users. Anyone
+              who tries signing in without an invite shows up here marked
+              &quot;No access&quot; - flip Access to grant them entry.
             </p>
           </div>
           <Button
@@ -157,6 +159,11 @@ const UsersSettings = () => {
                       {!user.plexId ? (
                         <Badge badgeType="warning" className="ml-2">
                           Pending invite
+                        </Badge>
+                      ) : null}
+                      {user.plexId && !user.allowed ? (
+                        <Badge badgeType="warning" className="ml-2">
+                          No access
                         </Badge>
                       ) : null}
                     </Table.TD>

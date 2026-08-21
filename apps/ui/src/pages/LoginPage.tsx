@@ -10,6 +10,7 @@ import Button from '../components/Common/Button'
 import LoadingSpinner from '../components/Common/LoadingSpinner'
 import { Input } from '../components/Forms/Input'
 import PlexLoginButton from '../components/Login/Plex'
+import { getApiErrorMessage } from '../utils/ApiError'
 
 const LoginPage = () => {
   const navigate = useNavigate()
@@ -26,7 +27,8 @@ const LoginPage = () => {
     setError(null)
     loginMutation.mutate(authToken, {
       onSuccess: () => navigate('/'),
-      onError: (mutationError) => setError(mutationError.message),
+      onError: (mutationError) =>
+        setError(getApiErrorMessage(mutationError, 'Sign-in failed.')),
     })
   }
 
@@ -37,7 +39,8 @@ const LoginPage = () => {
       { username, password },
       {
         onSuccess: () => navigate('/'),
-        onError: (mutationError) => setError(mutationError.message),
+        onError: (mutationError) =>
+          setError(getApiErrorMessage(mutationError, 'Sign-in failed.')),
       },
     )
   }
@@ -61,15 +64,17 @@ const LoginPage = () => {
         {isClientIdLoading ? (
           <LoadingSpinner />
         ) : (
-          <PlexLoginButton
-            clientIdentifier={clientId ?? ''}
-            isProcessing={loginMutation.isPending}
-            onAuthToken={handleAuthToken}
-            onError={(message) => {
-              setError(message)
-              toast.error(message)
-            }}
-          />
+          <div className="w-full max-w-xs">
+            <PlexLoginButton
+              clientIdentifier={clientId ?? ''}
+              isProcessing={loginMutation.isPending}
+              onAuthToken={handleAuthToken}
+              onError={(message) => {
+                setError(message)
+                toast.error(message)
+              }}
+            />
+          </div>
         )}
         {error && <p className="text-sm text-error-500">{error}</p>}
 
